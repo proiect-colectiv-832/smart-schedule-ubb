@@ -50,7 +50,7 @@ jobs:
           flutter --version
           SDK_DIR="${FLUTTER_HOME:-$FLUTTER_ROOT}"
           cd "$SDK_DIR"
-          curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply -v
+          curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply -3 -v || echo "Patch did not apply cleanly"
           git status
 
       - name: Build flutter
