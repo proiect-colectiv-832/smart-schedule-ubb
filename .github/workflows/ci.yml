@@ -1,13 +1,26 @@
 name: CI 
 on:
-  pull_request:
-    branches: [main, dev, test]
   push:
     branches: [main, dev, test]
-  merge:
+  pull_request:
     branches: [main, dev, test]
-  label: #label-ul se declanseaza la actiuniile astea
-    types: [created, deleted, edited]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  approved:
+    if: >
+      github.event_name == 'pull_request_review' &&
+      github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This PR was approved"
+
 jobs:
   node-backend:
     name: Node (backend) #https://github.com/actions/setup-node | https://docs.github.com/en/actions/tutorials/build-and-test-code/nodejs
@@ -50,16 +63,19 @@ jobs:
           flutter-version-file: pubspec.yaml
       #Apply a patch|Sometimes you find a bug in Flutter and you fix it yourself (you're a rockstar!), and then submit a patch/PR to Flutter repository. However, everyone knows that code review takes time, but your app needs the fix now.
       #Ce pula mea o mai inseamna si asta
-      - run: |
-        flutter --version
-        cd ${{ env.FLUTTER_ROOT }}
-        curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply
-        git status
+      - name: Apply temporary flutter patch
+        run: | 
+          set -e -u -x -o pipefail
+          flutter --version
+          SDK_DIR="${FLUTTER_HOME:-$FLUTTER_ROOT}"
+          cd "$SDK_DIR"cd ${{ env.FLUTTER_ROOT }}
+          curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply -v
+          git status
       - name: Build flutter
         run: flutter --version
         run: flutter pub get
         run: flutter analyze
-        run: flutter test
+        #run: flutter test INCA NU AVEM TESTELE
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -69,7 +85,7 @@ jobs:
           #flutter-version: 3.24.0
           flutter-version-file: pubspec.yaml
       - run: flutter pub get
-      - run: flutter test
+      #- run: flutter test INCA NU AVEM TESTELE
       - run: flutter build apk
       - run: flutter build appbundle
 
@@ -95,5 +111,5 @@ jobs:
             channel: stable
             flutter-version-file: pubspec.yaml
         - run: flutter pub get
-        - run: flutter test
+        #- run: flutter test INCA NU AVEM TESTELE
         - run: flutter build ios --release --no-codesign
