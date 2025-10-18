@@ -2,8 +2,10 @@ name: CI-FLUTTER-ANDROID
 on:
   push:
     branches: [main, dev, test]
+    paths: [frontend/**]
   pull_request:
     branches: [main, dev, test]
+    paths: [frontend/**]
     types: [opened, reopened, synchronize, labeled, unlabeled]
   pull_request_review:
     types: [submitted]
@@ -20,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "This PR was approved"
+
   flutter-frontend:
     name: Flutter (frontend) flutter-application and flutter-application-android #https://github.com/marketplace/actions/flutter-action
     runs-on: ubuntu-latest
@@ -28,7 +31,11 @@ jobs:
         working-directory: frontend
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -45,11 +52,13 @@ jobs:
           cd "$SDK_DIR"cd ${{ env.FLUTTER_ROOT }}
           curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply -v
           git status
+
       - name: Build flutter
         run: flutter --version
         run: flutter pub get
         run: flutter analyze
         #run: flutter test INCA NU AVEM TESTELE
+
   android-build:
     needs: flutter-frontend
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -57,10 +66,15 @@ jobs:
     defaults: { run: { working-directory: frontend } }
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Set up Flutter for Android
         uses: subosito/flutter-action@v2
         with:
+          channel: stable
           #flutter-version: 3.24.0
           flutter-version-file: pubspec.yaml
       - run: flutter pub get
