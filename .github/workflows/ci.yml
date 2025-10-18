@@ -1,13 +1,13 @@
 name: CI 
 on:
+  pull_request:
+    branches: [main, dev, test]
+  push:
+    branches: [main, dev, test]
+  merge:
+    branches: [main, dev, test]
   label: #label-ul se declanseaza la actiuniile astea
     types: [created, deleted, edited]
-      pull_request:
-        branches: [main, dev, test]
-      push:
-        branches: [main, dev, test]
-      merge:
-        branches: [main, dev, test]
 jobs:
   node-backend:
     name: Node (backend) #https://github.com/actions/setup-node | https://docs.github.com/en/actions/tutorials/build-and-test-code/nodejs
