@@ -11,7 +11,7 @@ on:
     types: [submitted]
 
 concurrency:
-  group: ci-flutter-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
           channel: stable
           cache: true
           #flutter-version: 3.19.0
-          flutter-version-file: pubspec.yaml
+          flutter-version-file: frontend/smart_schedule/pubspec.yaml
       #Apply a patch|Sometimes you find a bug in Flutter and you fix it yourself (you're a rockstar!), and then submit a patch/PR to Flutter repository. However, everyone knows that code review takes time, but your app needs the fix now.
       #Ce pula mea o mai inseamna si asta
       - name: Apply temporary flutter patch
@@ -76,7 +76,7 @@ jobs:
         with:
           channel: stable
           #flutter-version: 3.24.0
-          flutter-version-file: pubspec.yaml
+          flutter-version-file: frontend/smart_schedule/pubspec.yaml
       - run: flutter pub get
       - run: flutter test --if-present
       - run: flutter build apk 
