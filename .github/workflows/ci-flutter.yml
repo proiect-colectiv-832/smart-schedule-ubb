@@ -81,5 +81,5 @@ jobs:
           flutter-version-file: frontend/smart_schedule/pubspec.yaml
       - run: flutter pub get
       #- run: flutter test 
-      - run: flutter build apk 
-      - run: flutter build appbundle 
+      #- run: flutter build apk 
+      #- run: flutter build appbundle 

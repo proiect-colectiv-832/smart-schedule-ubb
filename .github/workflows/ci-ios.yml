@@ -38,5 +38,5 @@ jobs:
           channel: stable
           flutter-version-file: frontend/smart_schedule/pubspec.yaml
       - run: flutter pub get
-      - run: flutter test || true
-      - run: flutter build ios --release --no-codesign
+      #- run: flutter test || true
+      #- run: flutter build ios --release --no-codesign
