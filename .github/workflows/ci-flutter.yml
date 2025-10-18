@@ -55,8 +55,8 @@ jobs:
 
       - name: Build flutter
         run: flutter --version
-        run: flutter pub get
-        run: flutter analyze
+      - run: flutter pub get
+      - run: flutter analyze
         #run: flutter test INCA NU AVEM TESTELE
 
   android-build:
