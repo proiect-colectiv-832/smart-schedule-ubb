@@ -1,0 +1,99 @@
+name: CI 
+on:
+  label: #label-ul se declanseaza la actiuniile astea
+    types: [created, deleted, edited]
+      pull_request:
+        branches: [main, dev, test]
+      push:
+        branches: [main, dev, test]
+      merge:
+        branches: [main, dev, test]
+jobs:
+  node-backend:
+    name: Node (backend) #https://github.com/actions/setup-node | https://docs.github.com/en/actions/tutorials/build-and-test-code/nodejs
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    steps:
+    - uses: actions/checkout@v5 #https://github.com/actions/checkout
+      with:
+        check-latest: false #verifica ultima versiune de node.js
+        package-manager-cache: true #controleaza caching-ul automat pentru npm
+        #registry-url: '' !!!SA REVIN SA SETEZ .npmrc sau .yarnrc
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    - name: Install dependencies
+      run: npm install
+    - run: npm ci
+    - run: npm run build --if-present
+    - run: npm test
+
+  flutter-frontend:
+    name: Flutter (frontend) flutter-application and flutter-application-android #https://github.com/marketplace/actions/flutter-action
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          #flutter-version: 3.19.0
+          flutter-version-file: pubspec.yaml
+      #Apply a patch|Sometimes you find a bug in Flutter and you fix it yourself (you're a rockstar!), and then submit a patch/PR to Flutter repository. However, everyone knows that code review takes time, but your app needs the fix now.
+      #Ce pula mea o mai inseamna si asta
+      - run: |
+        flutter --version
+        cd ${{ env.FLUTTER_ROOT }}
+        curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply
+        git status
+      - name: Build flutter
+        run: flutter --version
+        run: flutter pub get
+        run: flutter analyze
+        run: flutter test
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - name: Set up Flutter for Android
+        uses: subosito/flutter-action@v2
+        with:
+          #flutter-version: 3.24.0
+          flutter-version-file: pubspec.yaml
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build apk
+      - run: flutter build appbundle
+
+      - name: Build for Android
+        run: flutter build apk
+        run: flutter build appbundle   
+    steps:
+
+      - name: Build for Android
+        run: flutter build apk
+        run: flutter build appbundle   
+
+jobs:
+  flutter-fronted-iOS: #https://github.com/marketplace/actions/flutter-build-ios
+    main:
+      runs-on: macos-latest
+      steps:
+        - name: Clone repository
+          uses: actions/checkout@v4
+        - name: Set up Flutter for iOs
+          uses: subosito/flutter-action@v2
+          with:
+            channel: stable
+            flutter-version-file: pubspec.yaml
+        - run: flutter pub get
+        - run: flutter test
+        - run: flutter build ios --release --no-codesign
