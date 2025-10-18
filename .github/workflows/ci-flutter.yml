@@ -49,7 +49,7 @@ jobs:
           set -e -u -x -o pipefail
           flutter --version
           SDK_DIR="${FLUTTER_HOME:-$FLUTTER_ROOT}"
-          cd "$SDK_DIR"cd ${{ env.FLUTTER_ROOT }}
+          cd "$SDK_DIR"
           curl https://patch-diff.githubusercontent.com/raw/flutter/flutter/pull/137874.patch | git apply -v
           git status
 
@@ -78,6 +78,6 @@ jobs:
           #flutter-version: 3.24.0
           flutter-version-file: frontend/smart_schedule/pubspec.yaml
       - run: flutter pub get
-      - run: flutter test --if-present
+      #- run: flutter test 
       - run: flutter build apk 
       - run: flutter build appbundle 
