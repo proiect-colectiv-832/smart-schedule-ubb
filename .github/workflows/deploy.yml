@@ -9,6 +9,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: false #sa nu mai ruleze pana nu ii dam deploy
     runs-on: ubuntu-latest
     environment: production
     steps:
