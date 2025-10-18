@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: frontend/smart_schedule
     steps:
       - name: Clone repository
         uses: actions/checkout@v5
@@ -63,7 +63,9 @@ jobs:
     needs: flutter-frontend
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: frontend } }
+    defaults:
+      run:
+        working-directory: frontend/smart_schedule
     steps:
       - name: Clone repository
         uses: actions/checkout@v5
