@@ -1,0 +1,18 @@
+name: DEPLOY
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/deploy.sh
+        env:
+          PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
