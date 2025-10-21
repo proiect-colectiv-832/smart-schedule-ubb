@@ -1,1 +1,74 @@
-.idea 
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Root env
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Root deps
+node_modules/
+
+# Backend (Node/TypeScript)
+backend/node_modules/
+backend/dist/
+backend/coverage/
+backend/.tsbuildinfo
+backend/.turbo/
+backend/.env
+backend/.env.*
+
+# Frontend (Flutter)
+frontend/smart_schedule/.dart_tool/
+frontend/smart_schedule/.flutter-plugins
+frontend/smart_schedule/.flutter-plugins-dependencies
+frontend/smart_schedule/.metadata
+frontend/smart_schedule/.pub/
+frontend/smart_schedule/.pub-cache/
+frontend/smart_schedule/build/
+frontend/smart_schedule/coverage/
+
+# Flutter iOS
+frontend/smart_schedule/ios/Pods/
+frontend/smart_schedule/ios/.symlinks/
+frontend/smart_schedule/ios/Flutter/ephemeral/
+frontend/smart_schedule/ios/Flutter/Flutter.framework
+frontend/smart_schedule/ios/Flutter/Flutter.podspec
+frontend/smart_schedule/ios/Runner/GeneratedPluginRegistrant.*
+frontend/smart_schedule/ios/build/
+frontend/smart_schedule/ios/Runner.xcodeproj/xcuserdata/
+frontend/smart_schedule/ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+frontend/smart_schedule/ios/Runner.xcworkspace/xcuserdata/
+
+# Flutter Android
+frontend/smart_schedule/android/.gradle/
+frontend/smart_schedule/android/.idea/
+frontend/smart_schedule/android/local.properties
+frontend/smart_schedule/android/app/*.keystore
+frontend/smart_schedule/android/build/
+frontend/smart_schedule/android/app/build/
+
+# Flutter macOS
+frontend/smart_schedule/macos/Flutter/ephemeral/
+frontend/smart_schedule/macos/Flutter/GeneratedPluginRegistrant.swift
+frontend/smart_schedule/macos/build/
+
+# Flutter Linux/Windows
+frontend/smart_schedule/linux/flutter/ephemeral/
+frontend/smart_schedule/linux/build/
+frontend/smart_schedule/windows/flutter/ephemeral/
+frontend/smart_schedule/windows/build/
+
+# Keep lock files tracked (do NOT ignore):
+# backend/package-lock.json
+# frontend/smart_schedule/pubspec.lock
