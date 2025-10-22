@@ -1,0 +1,21 @@
+name: DEPLOY
+on:
+  workflow_dispatch: {}
+  #push:
+    #branches: [main]
+  
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: false #sa nu mai ruleze pana nu ii dam deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/deploy.sh
+        env:
+          PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
