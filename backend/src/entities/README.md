@@ -34,7 +34,9 @@ entities/
 │  - code             │
 │  - timetableEntries │ ←── Conține array de TimetableEntry[] (din types.ts)
 └─────────────────────┘
-
+        ↑
+        │ 
+        │
 ┌─────────────────────────────────┐
 │    TimetableEntries             │ (o oră în orar)
 │  - id                           │
