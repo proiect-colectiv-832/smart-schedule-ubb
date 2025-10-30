@@ -1,13 +1,13 @@
 import { Timetable, TimetableEntry } from '../types';
 
 
-export class Professor {
+export class Teacher {
     name: string;
     timetableEntries: TimetableEntry[];  
 
-    constructor(data: Partial<Professor> = {}) {
+    constructor(data: Partial<Teacher> = {}) {
         if (data.name && data.name.trim().length === 0) {
-            throw new Error('Professor name cannot be empty');
+            throw new Error('Teacher name cannot be empty');
         }
 
         this.name = data.name ?? '';

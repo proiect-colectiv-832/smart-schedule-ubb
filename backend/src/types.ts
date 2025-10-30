@@ -28,7 +28,7 @@ export interface UrlMetadata {
   yearOfStudy: string;
 }
 
-export interface Professor {
+export interface Teacher {
   name: string;
   timetableEntries: TimetableEntry[];
 }
