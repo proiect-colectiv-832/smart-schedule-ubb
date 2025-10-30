@@ -27,3 +27,9 @@ export interface UrlMetadata {
   specialization: string;
   yearOfStudy: string;
 }
+
+export interface Subject {
+    name: string;
+    code: string;
+    timetableEntry: TimetableEntry[];
+}
