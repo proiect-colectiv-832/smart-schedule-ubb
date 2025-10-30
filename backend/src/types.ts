@@ -32,3 +32,9 @@ export interface Professor {
   name: string;
   timetableEntries: TimetableEntry[];
 }
+
+export interface Subject {
+    name: string;
+    code: string;
+    timetableEntry: TimetableEntry[];
+}
