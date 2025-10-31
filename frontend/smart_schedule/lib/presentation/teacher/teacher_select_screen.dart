@@ -39,9 +39,10 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                   return _CupertinoListItem(
                     title: t.name,
                     onTap: () async {
+                      final NavigatorState navigator = Navigator.of(context);
                       await provider.selectTeacherAndLoadTimeTable(t);
                       if (!mounted) return;
-                      Navigator.of(context).push(
+                      navigator.push(
                         CupertinoPageRoute<void>(
                           builder: (_) => const TeacherTimeTableScreen(),
                         ),

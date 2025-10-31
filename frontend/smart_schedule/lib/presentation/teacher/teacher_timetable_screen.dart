@@ -74,8 +74,10 @@ class _EntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String _formatTimeOfDay(TimeOfDay t) =>
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     final String time =
-        '${entry.interval.start.format(context)} - ${entry.interval.end.format(context)}';
+        '${_formatTimeOfDay(entry.interval.start)} - ${_formatTimeOfDay(entry.interval.end)}';
     return Container(
       decoration: BoxDecoration(
         color: CupertinoColors.systemGrey6,

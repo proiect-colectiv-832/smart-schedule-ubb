@@ -83,12 +83,15 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                       onPressed:
                           (_selectedField != null && _selectedYear != null)
                           ? () async {
+                              final NavigatorState navigator = Navigator.of(
+                                context,
+                              );
                               await provider.selectFieldYearAndLoadTimeTable(
                                 field: _selectedField!,
                                 year: _selectedYear!,
                               );
                               if (!mounted) return;
-                              Navigator.of(context).push(
+                              navigator.push(
                                 CupertinoPageRoute<void>(
                                   builder: (_) =>
                                       const StudentTimeTableScreen(),

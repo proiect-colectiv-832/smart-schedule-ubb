@@ -73,8 +73,10 @@ class _EntriesList extends StatelessWidget {
           child: ListView.separated(
             itemBuilder: (BuildContext context, int index) {
               final TimeTableEntry e = entries[index];
+              String _formatTimeOfDay(TimeOfDay t) =>
+                  '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
               final String time =
-                  '${e.interval.start.format(context)} - ${e.interval.end.format(context)}';
+                  '${_formatTimeOfDay(e.interval.start)} - ${_formatTimeOfDay(e.interval.end)}';
               return Container(
                 decoration: BoxDecoration(
                   color: CupertinoColors.systemGrey6,
