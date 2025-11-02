@@ -9,8 +9,9 @@
 export class Field {
     name: string;
     years: number[];
+    yearLinks: Map<number, string>; // Map of year -> URL
 
-    constructor(data: Partial<Field> = {}) {
+    constructor(data: Partial<Field> & { yearLinks?: Map<number, string> } = {}) {
         // Validate name
         if (data.name !== undefined) {
             if (data.name.trim().length === 0) {
@@ -30,6 +31,24 @@ export class Field {
 
         this.name = data.name ?? '';
         this.years = data.years ?? [];
+        this.yearLinks = data.yearLinks ?? new Map();
+    }
+
+    /**
+     * Add a year link
+     */
+    addYearLink(year: number, url: string): void {
+        if (!this.years.includes(year)) {
+            throw new Error(`Year ${year} is not valid for field ${this.name}`);
+        }
+        this.yearLinks.set(year, url);
+    }
+
+    /**
+     * Get URL for a specific year
+     */
+    getYearLink(year: number): string | undefined {
+        return this.yearLinks.get(year);
     }
 
     toString(): string {
