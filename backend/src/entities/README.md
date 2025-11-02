@@ -12,6 +12,8 @@ orare complete pentru studenți/profesori.
 
 ```
 entities/
+├── field.ts                 # Clasa Field (specializare/program de studiu)
+├── field_year_timetable.ts  # Clasa FieldYearTimeTable (orar pentru un an dintr-o specializare)
 ├── optional_subject.ts      # Clasa Optional_subject (materie/disciplină)
 ├── time_interval.ts         # Clasa TimeInterval (interval orar)
 ├── timetable_entries.ts     # Clasa TimetableEntries (o oră în orar)
@@ -28,6 +30,24 @@ entities/
 ### Diagrama relațiilor
 
 ```
+┌─────────────────────────────────┐
+│         Field                   │ (specializare/program de studiu)
+│  - name: string                 │ (ex: "Informatica - linia de studiu romana")
+│  - id: number                   │
+│  - years: number[]              │ (ex: [1, 2, 3])
+└─────────────────────────────────┘
+        │
+        │ conține orare pentru fiecare an
+        ↓
+┌─────────────────────────────────┐
+│   FieldYearTimeTable            │ (orar pentru un an dintr-o specializare)
+│  - field: Field                 │
+│  - year: number                 │ (ex: 3)
+│  - timeTables: Map<string,      │ (ex: "INFO3" → Timetable)
+│                    Timetable>    │      "INFO3/1" → Timetable
+└─────────────────────────────────┘      "INFO3/2" → Timetable
+        │
+        ↓
 ┌─────────────────────┐
 │  Optional_subject   │ (materie/disciplină)
 │  - name             │
@@ -71,7 +91,133 @@ entities/
 
 ## 📖 Descrierea claselor
 
-### 1. **Optional_subject** (Materie/Disciplină opțională)
+### 1. **Field** (Specializare/Program de studiu)
+
+**Scopul:** Reprezintă o specializare/program de studiu de la facultate (ex: "Informatica - linia de studiu romana")
+
+```typescript
+class Field {
+    name: string;      // Numele specializării
+    id: number;        // ID-ul unic al specializării
+    years: number[];   // Anii disponibili (ex: [1, 2, 3])
+    
+    toString(): string;  // Returnează "{name} {years}"
+}
+```
+
+**Validări în constructor:**
+- ✅ `name` - nu poate fi string gol
+- ✅ `id` - trebuie să fie integer non-negativ
+- ✅ `years` - trebuie să fie array de integers pozitivi
+
+**Exemplu:**
+```typescript
+const field = new Field({
+    name: "Informatica - linia de studiu romana",
+    id: 1,
+    years: [1, 2, 3]
+});
+
+console.log(field.toString()); 
+// Output: "Informatica - linia de studiu romana [1,2,3]"
+```
+
+**Exemple reale de specializări:**
+- Informatica - linia de studiu romana (id: 1, years: [1, 2, 3])
+- Matematica informatica - linia de studiu engleza (id: 2, years: [1, 2, 3])
+- Inteligenta Artificiala in limba engleza (id: 3, years: [1, 2])
+- Baze de date (Master) (id: 4, years: [1, 2])
+
+---
+
+### 2. **FieldYearTimeTable** (Orar pentru un an dintr-o specializare)
+
+**Scopul:** Conține toate orarele pentru un an specific dintr-o specializare (pentru toate grupele/subgrupele)
+
+```typescript
+class FieldYearTimeTable {
+    field: Field;                          // Specializarea
+    year: number;                          // Anul de studiu (ex: 3)
+    url: string;                           // URL către pagina cu orarul (ex: "MIE3.html")
+    timeTables: Map<string, Timetable>;    // Map: nume grupă → orar
+    
+    // Metode helper
+    addTimetable(group: string, timetable: Timetable): void;
+    getTimetable(group: string): Timetable | undefined;
+    getGroups(): string[];
+    getTimetableCount(): number;
+    toJSON(): object;  // Pentru serializare
+    toString(): string;
+}
+```
+
+**Validări în constructor:**
+- ✅ `field` - trebuie să fie instanță validă de Field
+- ✅ `year` - trebuie să fie integer pozitiv
+- ✅ `year` - trebuie să fie în lista de ani valizi din `field.years`
+- ✅ `url` - opțional, default string gol
+- ✅ `timeTables` - acceptă Map sau Record (se convertește automat)
+
+**Exemplu:**
+```typescript
+const field = new Field({
+    name: "Matematica informatica - linia de studiu engleza",
+    years: [1, 2, 3]
+});
+
+const fieldYearTimetable = new FieldYearTimeTable({
+    field: field,
+    year: 3,
+    url: "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html",
+    timeTables: new Map()
+});
+
+// Adaugă orare pentru diferite grupe
+fieldYearTimetable.addTimetable("MIE3", timetableMIE3);
+fieldYearTimetable.addTimetable("MIE3/1", timetableMIE3_1);
+fieldYearTimetable.addTimetable("MIE3/2", timetableMIE3_2);
+
+console.log(fieldYearTimetable.getGroups());
+// Output: ["MIE3", "MIE3/1", "MIE3/2"]
+
+console.log(fieldYearTimetable.getTimetableCount());
+// Output: 3
+
+console.log(fieldYearTimetable.url);
+// Output: "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html"
+```
+
+**Cazuri de utilizare:**
+- **Informatica Anul 3** → are orare pentru: INFO3, INFO3/1, INFO3/2
+- **MIE Anul 3** → are orare pentru: MIE3, 831, 831/1, 831/2
+- **Master Baze de date Anul 1** → are orar pentru: MaBD1
+
+**Diferența Map vs Record:**
+```typescript
+// Poți crea cu Map
+const withMap = new FieldYearTimeTable({
+    field: field,
+    year: 3,
+    timeTables: new Map([
+        ["MIE3", timetable1],
+        ["831", timetable2]
+    ])
+});
+
+// SAU cu Record (se convertește automat în Map)
+const withRecord = new FieldYearTimeTable({
+    field: field,
+    year: 3,
+    timeTables: {
+        "MIE3": timetable1,
+        "831": timetable2
+    }
+});
+```
+
+---
+
+### 3. **Optional_subject** (Materie/Disciplină opțională)
 
 **Scopul:** Reprezintă o materie academică cu toate orele ei (ex: "Programare Orientată pe Obiecte")
 
