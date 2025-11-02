@@ -26,6 +26,7 @@ const HEADER_MAP: Record<string, keyof TimetableEntry> = {
 
   ore: 'hours',
   ora: 'hours',
+  orele: 'hours',
   'interval orar': 'hours',
 
   frecventa: 'frequency',
@@ -40,11 +41,12 @@ const HEADER_MAP: Record<string, keyof TimetableEntry> = {
   grup: 'group',
   grupa: 'group',
   formatie: 'group',
-  'formatia': 'group',
+  formatia: 'group',
   'formatia/seria': 'group',
   serie: 'group',
 
   tip: 'type',
+  tipul: 'type',
   forma: 'type',
 
   disciplina: 'subject',
@@ -53,6 +55,7 @@ const HEADER_MAP: Record<string, keyof TimetableEntry> = {
 
   profesor: 'teacher',
   'cadre didactice': 'teacher',
+  'cadrul didactic': 'teacher',
   titular: 'teacher',
   'titular curs': 'teacher',
   'titular/seminar': 'teacher',
