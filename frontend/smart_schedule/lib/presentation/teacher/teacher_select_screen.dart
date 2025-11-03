@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:smart_schedule/data/data_provider.dart';
+import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/teacher/teacher_timetable_screen.dart';
@@ -19,21 +19,25 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
     super.initState();
     // Defer provider lookup to after first frame so InheritedNotifier is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final DataProvider provider = AppScope.of(context);
+      final BaseProvider provider = AppScope.of(context);
       provider.loadTeachers();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final DataProvider provider = AppScope.of(context);
+    final BaseProvider provider = AppScope.of(context);
     final teachers = provider.teachers;
-    
+
     // Filter teachers based on search query
     final filteredTeachers = _searchQuery.isEmpty
         ? teachers
-        : teachers.where((t) => 
-            t.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        : teachers
+              .where(
+                (t) =>
+                    t.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+              )
+              .toList();
 
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
@@ -80,11 +84,7 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  CupertinoIcons.search,
-                                  size: 64,
-                                  color: CupertinoColors.systemGrey.darkColor,
-                                ),
+                                // Avoid icons on web list when not personalized
                                 const SizedBox(height: 16),
                                 Text(
                                   _searchQuery.isEmpty
@@ -104,22 +104,29 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                               vertical: 8,
                             ),
                             itemBuilder: (BuildContext context, int index) {
-                              final TeacherName teacher = filteredTeachers[index];
+                              final TeacherName teacher =
+                                  filteredTeachers[index];
                               return _TeacherCard(
                                 teacher: teacher,
                                 onTap: () async {
-                                  final NavigatorState navigator = Navigator.of(context);
-                                  await provider.selectTeacherAndLoadTimeTable(teacher);
+                                  final NavigatorState navigator = Navigator.of(
+                                    context,
+                                  );
+                                  await provider.selectTeacherAndLoadTimeTable(
+                                    teacher,
+                                  );
                                   if (!mounted) return;
                                   navigator.push(
                                     CupertinoPageRoute<void>(
-                                      builder: (_) => const TeacherTimeTableScreen(),
+                                      builder: (_) =>
+                                          const TeacherTimeTableScreen(),
                                     ),
                                   );
                                 },
                               );
                             },
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
                             itemCount: filteredTeachers.length,
                           ),
                   ),
@@ -134,10 +141,7 @@ class _TeacherCard extends StatelessWidget {
   final TeacherName teacher;
   final VoidCallback onTap;
 
-  const _TeacherCard({
-    required this.teacher,
-    required this.onTap,
-  });
+  const _TeacherCard({required this.teacher, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -205,6 +209,7 @@ class _TeacherCard extends StatelessWidget {
     final parts = name.split(' ');
     if (parts.isEmpty) return '';
     if (parts.length == 1) return parts[0].substring(0, 1).toUpperCase();
-    return '${parts[0].substring(0, 1)}${parts[1].substring(0, 1)}'.toUpperCase();
+    return '${parts[0].substring(0, 1)}${parts[1].substring(0, 1)}'
+        .toUpperCase();
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:smart_schedule/data/data_provider.dart';
+import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/field.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
-import 'package:smart_schedule/presentation/student/student_timetable_screen.dart';
+import 'package:smart_schedule/presentation/student/groups_list_screen.dart';
 
 class FieldSelectScreen extends StatefulWidget {
   const FieldSelectScreen({super.key});
@@ -19,17 +19,17 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final DataProvider provider = AppScope.of(context);
+      final BaseProvider provider = AppScope.of(context);
       provider.loadFields();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final DataProvider provider = AppScope.of(context);
+    final BaseProvider provider = AppScope.of(context);
     final List<Field> fields = provider.fields;
     final List<int> years = _selectedField?.years ?? <int>[];
-    
+
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('Select Your Program'),
@@ -41,7 +41,7 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                 builder: (BuildContext context, BoxConstraints constraints) {
                   final double maxWidth = constraints.maxWidth;
                   final bool isWideScreen = maxWidth > 600;
-                  
+
                   return Container(
                     color: CupertinoColors.systemGroupedBackground,
                     child: Center(
@@ -80,7 +80,7 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                 ),
                               ),
                               const SizedBox(height: 40),
-                              
+
                               // Field Selection Card
                               Container(
                                 decoration: BoxDecoration(
@@ -88,26 +88,30 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: CupertinoColors.systemGrey.withOpacity(0.1),
+                                      color: CupertinoColors.systemGrey
+                                          .withOpacity(0.1),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     Padding(
                                       padding: const EdgeInsets.all(20.0),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           const Row(
                                             children: [
                                               Icon(
                                                 CupertinoIcons.square_list,
                                                 size: 20,
-                                                color: CupertinoColors.systemBlue,
+                                                color:
+                                                    CupertinoColors.systemBlue,
                                               ),
                                               SizedBox(width: 8),
                                               Text(
@@ -142,14 +146,16 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                       Padding(
                                         padding: const EdgeInsets.all(20.0),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             const Row(
                                               children: [
                                                 Icon(
                                                   CupertinoIcons.calendar,
                                                   size: 20,
-                                                  color: CupertinoColors.systemBlue,
+                                                  color: CupertinoColors
+                                                      .systemBlue,
                                                 ),
                                                 SizedBox(width: 8),
                                                 Text(
@@ -157,7 +163,8 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w600,
-                                                    color: CupertinoColors.black,
+                                                    color:
+                                                        CupertinoColors.black,
                                                   ),
                                                 ),
                                               ],
@@ -167,7 +174,9 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                               years: years,
                                               selectedYear: _selectedYear,
                                               onYearSelected: (int? y) {
-                                                setState(() => _selectedYear = y);
+                                                setState(
+                                                  () => _selectedYear = y,
+                                                );
                                               },
                                             ),
                                           ],
@@ -177,27 +186,33 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                   ],
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 32),
-                              
+
                               // Continue Button
                               CupertinoButton(
-                                onPressed: (_selectedField != null && _selectedYear != null)
+                                onPressed:
+                                    (_selectedField != null &&
+                                        _selectedYear != null)
                                     ? () async {
-                                        final NavigatorState navigator = Navigator.of(context);
-                                        await provider.selectFieldYearAndLoadTimeTable(
+                                        final NavigatorState navigator =
+                                            Navigator.of(context);
+                                        await provider.loadFieldYearTimetables(
                                           field: _selectedField!,
                                           year: _selectedYear!,
                                         );
                                         if (!mounted) return;
                                         navigator.push(
                                           CupertinoPageRoute<void>(
-                                            builder: (_) => const StudentTimeTableScreen(),
+                                            builder: (_) =>
+                                                const GroupsListScreen(),
                                           ),
                                         );
                                       }
                                     : null,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 color: CupertinoColors.systemBlue,
                                 borderRadius: BorderRadius.circular(12),
                                 child: const Text(
@@ -251,7 +266,7 @@ class _FieldDropdown extends StatelessWidget {
           color: CupertinoColors.systemGrey6,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: value != null 
+            color: value != null
                 ? CupertinoColors.systemBlue.withOpacity(0.3)
                 : CupertinoColors.transparent,
             width: 2,
@@ -264,7 +279,7 @@ class _FieldDropdown extends StatelessWidget {
               value?.name ?? 'Select a field',
               style: TextStyle(
                 fontSize: 16,
-                color: value != null 
+                color: value != null
                     ? CupertinoColors.black
                     : CupertinoColors.systemGrey.darkColor,
               ),
@@ -334,7 +349,7 @@ class _YearSelector extends StatelessWidget {
             width: 80,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: isSelected 
+              color: isSelected
                   ? CupertinoColors.systemBlue
                   : CupertinoColors.systemGrey6,
               borderRadius: BorderRadius.circular(12),
@@ -351,7 +366,7 @@ class _YearSelector extends StatelessWidget {
                   'Year',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isSelected 
+                    color: isSelected
                         ? CupertinoColors.white
                         : CupertinoColors.systemGrey.darkColor,
                   ),
@@ -362,7 +377,7 @@ class _YearSelector extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: isSelected 
+                    color: isSelected
                         ? CupertinoColors.white
                         : CupertinoColors.black,
                   ),

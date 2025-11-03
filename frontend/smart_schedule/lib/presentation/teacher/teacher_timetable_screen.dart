@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show TimeOfDay;
-import 'package:smart_schedule/data/data_provider.dart';
+import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 
@@ -9,20 +9,20 @@ class TeacherTimeTableScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DataProvider provider = AppScope.of(context);
+    final BaseProvider provider = AppScope.of(context);
     final List<TimeTableEntry> entries =
         provider.currentTimeTable?.entries ?? <TimeTableEntry>[];
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('My Teaching Schedule'),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.calendar),
-          onPressed: () {
-            // Calendar view functionality
-          },
-        ),
+        trailing: provider.isPersonalizationEnabled
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: const Icon(CupertinoIcons.calendar),
+                onPressed: () {},
+              )
+            : null,
       ),
       child: SafeArea(
         child: Container(
@@ -42,7 +42,7 @@ class TeacherTimeTableScreen extends StatelessWidget {
 
   Widget _buildTimetableGrid(
     List<TimeTableEntry> entries,
-    DataProvider provider,
+    BaseProvider provider,
   ) {
     // Group entries by day
     final Map<Day, List<TimeTableEntry>> entriesByDay =
@@ -71,98 +71,97 @@ class TeacherTimeTableScreen extends StatelessWidget {
     ];
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final day = days[index];
-          final dayEntries = entriesByDay[day] ?? <TimeTableEntry>[];
-          final dayName = _formatDayName(day);
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final day = days[index];
+        final dayEntries = entriesByDay[day] ?? <TimeTableEntry>[];
+        final dayName = _formatDayName(day);
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8.0,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        dayName,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: CupertinoColors.black,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 8.0,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      dayName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: CupertinoColors.black,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (dayEntries.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.systemBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${dayEntries.length} ${dayEntries.length == 1 ? 'class' : 'classes'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: CupertinoColors.systemBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      if (dayEntries.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.systemBlue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${dayEntries.length} ${dayEntries.length == 1 ? 'class' : 'classes'}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: CupertinoColors.systemBlue,
-                              fontWeight: FontWeight.w600,
-                            ),
+                  ],
+                ),
+              ),
+              if (dayEntries.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemGrey6,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          CupertinoIcons.moon_stars,
+                          size: 32,
+                          color: CupertinoColors.systemGrey.darkColor,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Free day - No classes scheduled',
+                          style: TextStyle(
+                            color: CupertinoColors.systemGrey.darkColor,
+                            fontSize: 14,
                           ),
                         ),
-                    ],
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...dayEntries.map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: _TeachingClassCard(
+                      entry: entry,
+                      onDelete: provider.isPersonalizationEnabled
+                          ? () => provider.removeEntry(entry.id)
+                          : null,
+                    ),
                   ),
                 ),
-                if (dayEntries.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            CupertinoIcons.moon_stars,
-                            size: 32,
-                            color: CupertinoColors.systemGrey.darkColor,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Free day - No classes scheduled',
-                            style: TextStyle(
-                              color: CupertinoColors.systemGrey.darkColor,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  ...dayEntries.map(
-                    (entry) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: _TeachingClassCard(
-                        entry: entry,
-                        onDelete: () => provider.removeEntry(entry.id),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-        childCount: days.length,
-      ),
+            ],
+          ),
+        );
+      }, childCount: days.length),
     );
   }
 
@@ -189,12 +188,9 @@ class TeacherTimeTableScreen extends StatelessWidget {
 // Teaching Class Card Widget
 class _TeachingClassCard extends StatelessWidget {
   final TimeTableEntry entry;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
 
-  const _TeachingClassCard({
-    required this.entry,
-    required this.onDelete,
-  });
+  const _TeachingClassCard({required this.entry, required this.onDelete});
 
   String _formatTimeOfDay(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -248,12 +244,7 @@ class _TeachingClassCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: CupertinoColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(
-            color: typeColor,
-            width: 5,
-          ),
-        ),
+        border: Border(left: BorderSide(color: typeColor, width: 5)),
         boxShadow: [
           BoxShadow(
             color: CupertinoColors.systemGrey.withOpacity(0.1),
@@ -276,11 +267,7 @@ class _TeachingClassCard extends StatelessWidget {
                     color: typeColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    typeIcon,
-                    size: 24,
-                    color: typeColor,
-                  ),
+                  child: Icon(typeIcon, size: 24, color: typeColor),
                 ),
                 const SizedBox(width: 12),
                 // Subject name and type
@@ -319,23 +306,21 @@ class _TeachingClassCard extends StatelessWidget {
                   ),
                 ),
                 // Delete button
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  child: const Icon(
-                    CupertinoIcons.trash,
-                    size: 20,
-                    color: CupertinoColors.systemGrey,
+                if (onDelete != null)
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(
+                      CupertinoIcons.trash,
+                      size: 20,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                    onPressed: onDelete,
                   ),
-                  onPressed: onDelete,
-                ),
               ],
             ),
             const SizedBox(height: 12),
             // Divider
-            Container(
-              height: 1,
-              color: CupertinoColors.separator,
-            ),
+            Container(height: 1, color: CupertinoColors.separator),
             const SizedBox(height: 12),
             // Time and location details
             Row(

@@ -1,14 +1,14 @@
 import 'package:flutter/widgets.dart';
-import 'package:smart_schedule/data/data_provider.dart';
+import 'package:smart_schedule/data/base_provider.dart';
 
-class AppScope extends InheritedNotifier<DataProvider> {
+class AppScope extends InheritedNotifier<BaseProvider> {
   const AppScope({
     super.key,
-    required DataProvider notifier,
+    required BaseProvider notifier,
     required Widget child,
   }) : super(notifier: notifier, child: child);
 
-  static DataProvider of(BuildContext context) {
+  static BaseProvider of(BuildContext context) {
     final AppScope? scope = context
         .dependOnInheritedWidgetOfExactType<AppScope>();
     assert(scope != null, 'AppScope not found in context');

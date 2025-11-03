@@ -1,8 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:smart_schedule/data/api_handler.dart';
+import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/data/data_provider.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/role_selection.dart';
+import 'package:smart_schedule/presentation/my/my_timetable_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,17 +16,59 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DataProvider provider = DataProvider(api: const ApiHandler());
-    return CupertinoApp(
-      title: 'Smart Schedule PWA',
-      debugShowCheckedModeBanner: false,
-      home: const RoleSelectionScreen(),
-      builder: (BuildContext context, Widget? child) {
-        return AppScope(
-          notifier: provider,
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
-    );
+    final BaseProvider provider = PlatformService.isMobilePwa
+        ? MobileDataProvider(api: const ApiHandler())
+        : WebDataProvider(api: const ApiHandler());
+    if (provider is MobileDataProvider) {
+      // Restore personalized timetable if any
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        provider.restorePersonalizedIfAny();
+      });
+      return CupertinoApp(
+        title: 'Smart Schedule PWA',
+        debugShowCheckedModeBanner: false,
+        builder: (BuildContext context, Widget? child) {
+          return AppScope(
+            notifier: provider,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        home: CupertinoTabScaffold(
+          tabBar: CupertinoTabBar(
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.search),
+                label: 'Browse',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.person_crop_square),
+                label: 'My Timetable',
+              ),
+            ],
+          ),
+          tabBuilder: (BuildContext context, int index) {
+            switch (index) {
+              case 0:
+                return const RoleSelectionScreen();
+              case 1:
+              default:
+                return const MyTimetableScreen();
+            }
+          },
+        ),
+      );
+    } else {
+      return CupertinoApp(
+        title: 'Smart Schedule PWA',
+        debugShowCheckedModeBanner: false,
+        builder: (BuildContext context, Widget? child) {
+          return AppScope(
+            notifier: provider,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        home: const RoleSelectionScreen(),
+      );
+    }
   }
 }

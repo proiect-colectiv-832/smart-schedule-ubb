@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
- import 'package:flutter/material.dart' show TimeOfDay;
-import 'package:smart_schedule/data/data_provider.dart';
+import 'package:flutter/material.dart' show TimeOfDay;
+import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 
@@ -16,7 +16,7 @@ class _StudentTimeTableScreenState extends State<StudentTimeTableScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final DataProvider provider = AppScope.of(context);
+    final BaseProvider provider = AppScope.of(context);
     final List<TimeTableEntry> entries =
         provider.currentTimeTable?.entries ?? <TimeTableEntry>[];
     final subjects = provider.subjects;
@@ -24,13 +24,13 @@ class _StudentTimeTableScreenState extends State<StudentTimeTableScreen> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('My Schedule'),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.refresh),
-          onPressed: () {
-            // Refresh functionality
-          },
-        ),
+        trailing: provider.isPersonalizationEnabled
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: const Icon(CupertinoIcons.refresh),
+                onPressed: () {},
+              )
+            : null,
       ),
       child: SafeArea(
         child: LayoutBuilder(
@@ -48,26 +48,24 @@ class _StudentTimeTableScreenState extends State<StudentTimeTableScreen> {
                           provider: provider,
                         ),
                       ),
-                      Container(
-                        width: 1,
-                        color: CupertinoColors.separator,
-                      ),
-                      SizedBox(
-                        width: 380,
-                        child: _OptionalLecturesPanel(
-                          subjects: subjects,
-                          selectedLectures: _selectedOptionalLectures,
-                          onToggleLecture: (int id) {
-                            setState(() {
-                              if (_selectedOptionalLectures.contains(id)) {
-                                _selectedOptionalLectures.remove(id);
-                              } else {
-                                _selectedOptionalLectures.add(id);
-                              }
-                            });
-                          },
+                      Container(width: 1, color: CupertinoColors.separator),
+                      if (provider.isPersonalizationEnabled)
+                        SizedBox(
+                          width: 380,
+                          child: _OptionalLecturesPanel(
+                            subjects: subjects,
+                            selectedLectures: _selectedOptionalLectures,
+                            onToggleLecture: (int id) {
+                              setState(() {
+                                if (_selectedOptionalLectures.contains(id)) {
+                                  _selectedOptionalLectures.remove(id);
+                                } else {
+                                  _selectedOptionalLectures.add(id);
+                                }
+                              });
+                            },
+                          ),
                         ),
-                      ),
                     ],
                   )
                 : Column(
@@ -79,26 +77,25 @@ class _StudentTimeTableScreenState extends State<StudentTimeTableScreen> {
                           provider: provider,
                         ),
                       ),
-                      Container(
-                        height: 1,
-                        color: CupertinoColors.separator,
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: _OptionalLecturesPanel(
-                          subjects: subjects,
-                          selectedLectures: _selectedOptionalLectures,
-                          onToggleLecture: (int id) {
-                            setState(() {
-                              if (_selectedOptionalLectures.contains(id)) {
-                                _selectedOptionalLectures.remove(id);
-                              } else {
-                                _selectedOptionalLectures.add(id);
-                              }
-                            });
-                          },
+                      if (provider.isPersonalizationEnabled) ...[
+                        Container(height: 1, color: CupertinoColors.separator),
+                        Expanded(
+                          flex: 2,
+                          child: _OptionalLecturesPanel(
+                            subjects: subjects,
+                            selectedLectures: _selectedOptionalLectures,
+                            onToggleLecture: (int id) {
+                              setState(() {
+                                if (_selectedOptionalLectures.contains(id)) {
+                                  _selectedOptionalLectures.remove(id);
+                                } else {
+                                  _selectedOptionalLectures.add(id);
+                                }
+                              });
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   );
           },
@@ -111,12 +108,9 @@ class _StudentTimeTableScreenState extends State<StudentTimeTableScreen> {
 // Timetable View Widget
 class _TimetableView extends StatelessWidget {
   final List<TimeTableEntry> entries;
-  final DataProvider provider;
+  final BaseProvider provider;
 
-  const _TimetableView({
-    required this.entries,
-    required this.provider,
-  });
+  const _TimetableView({required this.entries, required this.provider});
 
   String _formatTimeOfDay(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -150,7 +144,8 @@ class _TimetableView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Group entries by day
-    final Map<Day, List<TimeTableEntry>> entriesByDay = <Day, List<TimeTableEntry>>{};
+    final Map<Day, List<TimeTableEntry>> entriesByDay =
+        <Day, List<TimeTableEntry>>{};
     for (final entry in entries) {
       entriesByDay.putIfAbsent(entry.day, () => <TimeTableEntry>[]).add(entry);
     }
@@ -181,67 +176,64 @@ class _TimetableView extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final day = days[index];
-                  final dayEntries = entriesByDay[day] ?? <TimeTableEntry>[];
-                  final dayName = _formatDayName(day);
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final day = days[index];
+                final dayEntries = entriesByDay[day] ?? <TimeTableEntry>[];
+                final dayName = _formatDayName(day);
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8.0,
-                            vertical: 8.0,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0,
+                          vertical: 8.0,
+                        ),
+                        child: Text(
+                          dayName,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: CupertinoColors.black,
                           ),
-                          child: Text(
-                            dayName,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: CupertinoColors.black,
+                        ),
+                      ),
+                      if (dayEntries.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemGrey6,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'No classes scheduled',
+                              style: TextStyle(
+                                color: CupertinoColors.systemGrey.darkColor,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        ...dayEntries.map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: _TimetableCard(
+                              entry: entry,
+                              typeColor: _getTypeColor(entry.type),
+                              typeLabel: _getTypeLabel(entry.type),
+                              formatTime: _formatTimeOfDay,
+                              onDelete: () => provider.removeEntry(entry.id),
                             ),
                           ),
                         ),
-                        if (dayEntries.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: CupertinoColors.systemGrey6,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'No classes scheduled',
-                                style: TextStyle(
-                                  color: CupertinoColors.systemGrey.darkColor,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          ...dayEntries.map(
-                            (entry) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: _TimetableCard(
-                                entry: entry,
-                                typeColor: _getTypeColor(entry.type),
-                                typeLabel: _getTypeLabel(entry.type),
-                                formatTime: _formatTimeOfDay,
-                                onDelete: () => provider.removeEntry(entry.id),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
-                childCount: days.length,
-              ),
+                    ],
+                  ),
+                );
+              }, childCount: days.length),
             ),
           ),
         ],
@@ -291,12 +283,7 @@ class _TimetableCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: CupertinoColors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(
-            color: typeColor,
-            width: 4,
-          ),
-        ),
+        border: Border(left: BorderSide(color: typeColor, width: 4)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -533,10 +520,7 @@ class _SelectionSummary extends StatelessWidget {
   final int selected;
   final int total;
 
-  const _SelectionSummary({
-    required this.selected,
-    required this.total,
-  });
+  const _SelectionSummary({required this.selected, required this.total});
 
   @override
   Widget build(BuildContext context) {

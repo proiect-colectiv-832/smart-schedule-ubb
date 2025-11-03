@@ -104,4 +104,78 @@ class ApiHandler {
       entries: entries,
     );
   }
+
+  Future<List<StudentTimeTable>> fetchFieldYearTimeTables({
+    required Field field,
+    required int year,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final TeacherName staff = TeacherName(name: 'Staff');
+    List<StudentTimeTable> groups = <StudentTimeTable>[
+      StudentTimeTable(
+        field: field,
+        year: year,
+        groupName: 'Group A',
+        entries: <TimeTableEntry>[
+          TimeTableEntry(
+            id: 201,
+            day: Day.monday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 8, minute: 0),
+              end: const TimeOfDay(hour: 10, minute: 0),
+            ),
+            subjectName: 'Programming I',
+            teacher: staff,
+            frequency: Frequency.weekly,
+            type: Type.lecture,
+            room: 'A101',
+            format: 'On-site',
+          ),
+        ],
+      ),
+      StudentTimeTable(
+        field: field,
+        year: year,
+        groupName: 'Group B',
+        entries: <TimeTableEntry>[
+          TimeTableEntry(
+            id: 202,
+            day: Day.tuesday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 10, minute: 0),
+              end: const TimeOfDay(hour: 12, minute: 0),
+            ),
+            subjectName: 'Programming I',
+            teacher: staff,
+            frequency: Frequency.weekly,
+            type: Type.lab,
+            room: 'Lab 1',
+            format: 'On-site',
+          ),
+        ],
+      ),
+      StudentTimeTable(
+        field: field,
+        year: year,
+        groupName: 'Group C',
+        entries: <TimeTableEntry>[
+          TimeTableEntry(
+            id: 203,
+            day: Day.wednesday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 12, minute: 30),
+              end: const TimeOfDay(hour: 14, minute: 0),
+            ),
+            subjectName: 'Linear Algebra',
+            teacher: staff,
+            frequency: Frequency.weekly,
+            type: Type.seminar,
+            room: 'C202',
+            format: 'On-site',
+          ),
+        ],
+      ),
+    ];
+    return groups;
+  }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:smart_schedule/data/data_provider.dart';
+import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/student/field_select_screen.dart';
 import 'package:smart_schedule/presentation/teacher/teacher_select_screen.dart';
@@ -9,7 +9,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DataProvider provider = AppScope.of(context);
+    final BaseProvider provider = AppScope.of(context);
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('Smart Schedule'),
@@ -19,7 +19,7 @@ class RoleSelectionScreen extends StatelessWidget {
           builder: (BuildContext context, BoxConstraints constraints) {
             final double maxWidth = constraints.maxWidth;
             final bool isWideScreen = maxWidth > 700;
-            
+
             return Container(
               color: CupertinoColors.systemGroupedBackground,
               child: Center(
@@ -40,7 +40,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           color: CupertinoColors.systemBlue,
                         ),
                         const SizedBox(height: 24),
-                        
+
                         // Title
                         const Text(
                           'Smart Schedule',
@@ -52,7 +52,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        
+
                         // Subtitle
                         Text(
                           'Manage your academic schedule efficiently',
@@ -63,9 +63,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 48),
-                        
-                
-                        
+
                         // Teacher Card
                         _RoleCard(
                           icon: CupertinoIcons.person_3_fill,
@@ -83,12 +81,13 @@ class RoleSelectionScreen extends StatelessWidget {
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Student Card
                         _RoleCard(
                           icon: CupertinoIcons.book_fill,
                           title: 'Student',
-                          description: 'Access your class schedule and optional courses',
+                          description:
+                              'Access your class schedule and optional courses',
                           color: CupertinoColors.systemGreen,
                           onTap: () async {
                             provider.setIsTeacher(false);
@@ -144,8 +143,7 @@ class _RoleCardState extends State<_RoleCard> {
       onTap: widget.onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        transform: Matrix4.identity()
-          ..scale(_isPressed ? 0.98 : 1.0),
+        transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
         decoration: BoxDecoration(
           color: CupertinoColors.white,
           borderRadius: BorderRadius.circular(20),
@@ -156,10 +154,7 @@ class _RoleCardState extends State<_RoleCard> {
               offset: Offset(0, _isPressed ? 4 : 8),
             ),
           ],
-          border: Border.all(
-            color: widget.color.withOpacity(0.2),
-            width: 2,
-          ),
+          border: Border.all(color: widget.color.withOpacity(0.2), width: 2),
         ),
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -173,14 +168,10 @@ class _RoleCardState extends State<_RoleCard> {
                   color: widget.color.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  widget.icon,
-                  size: 36,
-                  color: widget.color,
-                ),
+                child: Icon(widget.icon, size: 36, color: widget.color),
               ),
               const SizedBox(width: 20),
-              
+
               // Text content
               Expanded(
                 child: Column(
@@ -205,13 +196,9 @@ class _RoleCardState extends State<_RoleCard> {
                   ],
                 ),
               ),
-              
+
               // Arrow
-              Icon(
-                CupertinoIcons.chevron_right,
-                color: widget.color,
-                size: 24,
-              ),
+              Icon(CupertinoIcons.chevron_right, color: widget.color, size: 24),
             ],
           ),
         ),
