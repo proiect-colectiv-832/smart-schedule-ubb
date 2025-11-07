@@ -3,6 +3,8 @@ import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetables.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/student/readonly_timetable_screen.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
+import 'package:smart_schedule/utils/web_route.dart';
 
 class GroupsListScreen extends StatefulWidget {
   const GroupsListScreen({super.key});
@@ -34,7 +36,10 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
   Widget build(BuildContext context) {
     final BaseProvider provider = AppScope.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('Select Group')),
+      backgroundColor: CupertinoColors.white,
+      navigationBar: PlatformService.isWeb
+          ? null
+          : const CupertinoNavigationBar(middle: Text('Select Group')),
       child: SafeArea(
         child: provider.isLoading
             ? const Center(child: CupertinoActivityIndicator())
@@ -45,8 +50,12 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
                       provider.fieldYearTimetables[index];
                   return Container(
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
+                      color: CupertinoColors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: CupertinoColors.systemGrey4,
+                        width: 1,
+                      ),
                     ),
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -60,14 +69,15 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
+                                  color: CupertinoColors.black,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '${st.field.name} • Year ${st.year}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: CupertinoColors.inactiveGray,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: CupertinoColors.systemGrey.darkColor,
                                 ),
                               ),
                             ],
@@ -78,22 +88,30 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
                             horizontal: 8,
                             vertical: 6,
                           ),
+                          color: CupertinoColors.activeBlue,
+                          borderRadius: BorderRadius.circular(8),
                           onPressed: () {
                             Navigator.of(context).push(
-                              CupertinoPageRoute<void>(
+                              createWebAwareRoute<void>(
                                 builder: (_) =>
                                     ReadonlyTimetableScreen(timetable: st),
                               ),
                             );
                           },
-                          child: const Text('View'),
+                          child: const Text(
+                            'View',
+                            style: TextStyle(color: CupertinoColors.white),
+                          ),
                         ),
+                        if (provider.isPersonalizationEnabled)
+                          const SizedBox(width: 8),
                         if (provider.isPersonalizationEnabled)
                           CupertinoButton(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 6,
                             ),
+                            borderRadius: BorderRadius.circular(8),
                             onPressed: () {
                               provider.importFromTimeTable(st);
                             },

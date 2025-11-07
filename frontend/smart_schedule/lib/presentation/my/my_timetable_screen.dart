@@ -4,6 +4,8 @@ import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/role_selection.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
+import 'package:smart_schedule/utils/web_route.dart';
 
 class MyTimetableScreen extends StatelessWidget {
   const MyTimetableScreen({super.key});
@@ -16,7 +18,9 @@ class MyTimetableScreen extends StatelessWidget {
         provider.currentTimeTable?.entries ?? <TimeTableEntry>[];
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('My Timetable')),
+      navigationBar: PlatformService.isWeb
+          ? null
+          : const CupertinoNavigationBar(middle: Text('My Timetable')),
       child: SafeArea(
         child: enabled
             ? _PersonalizedBody(entries: entries, provider: provider)
@@ -72,7 +76,7 @@ class _PersonalizedBody extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   onPressed: () {
                     Navigator.of(context).push(
-                      CupertinoPageRoute<void>(
+                      createWebAwareRoute<void>(
                         builder: (_) => const RoleSelectionScreen(),
                       ),
                     );

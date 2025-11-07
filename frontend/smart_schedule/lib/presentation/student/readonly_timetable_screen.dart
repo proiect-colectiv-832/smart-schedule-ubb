@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
 
 class ReadonlyTimetableScreen extends StatelessWidget {
   final TimeTable timetable;
@@ -20,9 +21,10 @@ class ReadonlyTimetableScreen extends StatelessWidget {
       subjects.putIfAbsent(e.subjectName, () => <TimeTableEntry>[]).add(e);
     }
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Group Timetable'),
-      ),
+      backgroundColor: CupertinoColors.white,
+      navigationBar: PlatformService.isWeb
+          ? null
+          : const CupertinoNavigationBar(middle: Text('Group Timetable')),
       child: SafeArea(
         child: Column(
           children: <Widget>[
@@ -33,8 +35,12 @@ class ReadonlyTimetableScreen extends StatelessWidget {
                   final e = entries[index];
                   return Container(
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
+                      color: CupertinoColors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: CupertinoColors.systemGrey4,
+                        width: 1,
+                      ),
                     ),
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -48,14 +54,15 @@ class ReadonlyTimetableScreen extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
+                                  color: CupertinoColors.black,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '${e.day.name.toUpperCase()} • ${_fmt(e.interval.start)} - ${_fmt(e.interval.end)} • ${e.room}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: CupertinoColors.inactiveGray,
+                                  color: CupertinoColors.systemGrey.darkColor,
                                 ),
                               ),
                             ],

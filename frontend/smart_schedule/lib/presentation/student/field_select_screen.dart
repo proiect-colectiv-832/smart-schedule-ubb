@@ -3,6 +3,9 @@ import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/field.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/student/groups_list_screen.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
+import 'package:smart_schedule/utils/web_route.dart';
+import 'web_select_stub.dart' if (dart.library.html) 'web_select_html.dart';
 
 class FieldSelectScreen extends StatefulWidget {
   const FieldSelectScreen({super.key});
@@ -31,9 +34,9 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
     final List<int> years = _selectedField?.years ?? <int>[];
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Select Your Program'),
-      ),
+      navigationBar: PlatformService.isWeb
+          ? null
+          : const CupertinoNavigationBar(middle: Text('Select Your Program')),
       child: SafeArea(
         child: provider.isLoading
             ? const Center(child: CupertinoActivityIndicator())
@@ -203,7 +206,7 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                                         );
                                         if (!mounted) return;
                                         navigator.push(
-                                          CupertinoPageRoute<void>(
+                                          createWebAwareRoute<void>(
                                             builder: (_) =>
                                                 const GroupsListScreen(),
                                           ),
@@ -250,6 +253,16 @@ class _FieldDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool useWebControls =
+        PlatformService.isWeb && !PlatformService.isStandalonePwa;
+    if (useWebControls) {
+      return buildWebFieldDropdown(
+        items: items,
+        value: value,
+        onChanged: onChanged,
+      );
+    }
+
     return GestureDetector(
       onTap: () async {
         final Field? result = await showCupertinoModalPopup<Field>(
@@ -338,6 +351,16 @@ class _YearSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool useWebControls =
+        PlatformService.isWeb && !PlatformService.isStandalonePwa;
+    if (useWebControls) {
+      return buildWebYearDropdown(
+        years: years,
+        value: selectedYear,
+        onChanged: onYearSelected,
+      );
+    }
+
     return Wrap(
       spacing: 12,
       runSpacing: 12,

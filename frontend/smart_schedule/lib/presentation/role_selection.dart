@@ -3,6 +3,8 @@ import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/presentation/student/field_select_screen.dart';
 import 'package:smart_schedule/presentation/teacher/teacher_select_screen.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
+import 'package:smart_schedule/utils/web_route.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -11,9 +13,9 @@ class RoleSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final BaseProvider provider = AppScope.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Smart Schedule'),
-      ),
+      navigationBar: PlatformService.isWeb
+          ? null
+          : const CupertinoNavigationBar(middle: Text('Smart Schedule')),
       child: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
@@ -74,7 +76,7 @@ class RoleSelectionScreen extends StatelessWidget {
                             provider.setIsTeacher(true);
                             // ignore: use_build_context_synchronously
                             Navigator.of(context).push(
-                              CupertinoPageRoute<void>(
+                              createWebAwareRoute<void>(
                                 builder: (_) => const TeacherSelectScreen(),
                               ),
                             );
@@ -93,7 +95,7 @@ class RoleSelectionScreen extends StatelessWidget {
                             provider.setIsTeacher(false);
                             // ignore: use_build_context_synchronously
                             Navigator.of(context).push(
-                              CupertinoPageRoute<void>(
+                              createWebAwareRoute<void>(
                                 builder: (_) => const FieldSelectScreen(),
                               ),
                             );

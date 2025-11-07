@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
 
 class TeacherTimeTableScreen extends StatelessWidget {
   const TeacherTimeTableScreen({super.key});
@@ -14,16 +15,18 @@ class TeacherTimeTableScreen extends StatelessWidget {
         provider.currentTimeTable?.entries ?? <TimeTableEntry>[];
 
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('My Teaching Schedule'),
-        trailing: provider.isPersonalizationEnabled
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.calendar),
-                onPressed: () {},
-              )
-            : null,
-      ),
+      navigationBar: PlatformService.isWeb
+          ? null
+          : CupertinoNavigationBar(
+              middle: const Text('My Teaching Schedule'),
+              trailing: provider.isPersonalizationEnabled
+                  ? CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      child: const Icon(CupertinoIcons.calendar),
+                      onPressed: () {},
+                    )
+                  : null,
+            ),
       child: SafeArea(
         child: Container(
           color: CupertinoColors.systemGroupedBackground,
