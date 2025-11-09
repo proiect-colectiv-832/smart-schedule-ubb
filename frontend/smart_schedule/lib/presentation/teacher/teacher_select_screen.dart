@@ -41,27 +41,46 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
               )
               .toList();
 
-    return CupertinoPageScaffold(
+    final Widget content = CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
-      navigationBar: PlatformService.isWeb
-          ? null
-          : const CupertinoNavigationBar(middle: Text('Select Teacher')),
+      navigationBar: null,
       child: SafeArea(
         child: provider.isLoading
             ? const Center(child: CupertinoActivityIndicator())
             : Column(
                 children: [
-                  // Search bar
+                  // Search bar with back button
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: CupertinoSearchTextField(
-                      placeholder: 'Search teachers...',
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                      style: const TextStyle(fontSize: 16),
+                    child: Row(
+                      children: [
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minSize: 0,
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Icon(
+                            CupertinoIcons.back,
+                            size: 28,
+                            color: CupertinoColors.systemBlue,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: CupertinoSearchTextField(
+                            prefixIcon: const Icon(
+                              CupertinoIcons.search,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                            placeholder: 'Search teachers...',
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   // Results count
@@ -99,13 +118,13 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                         }
 
                         final double width = constraints.maxWidth;
-                        int crossAxisCount = (width / 220).floor();
+                        int crossAxisCount = (width / 150).floor();
                         if (crossAxisCount < 3) crossAxisCount = 3;
 
                         return GridView.builder(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                            horizontal: 8,
+                            vertical: 5,
                           ),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
@@ -144,6 +163,11 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
               ),
       ),
     );
+
+    if (!PlatformService.isWeb) {
+      return PopScope(canPop: false, child: content);
+    }
+    return content;
   }
 }
 

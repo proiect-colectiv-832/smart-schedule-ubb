@@ -8,6 +8,7 @@ import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/models/timetables.dart';
 
 class MobileDataProvider extends BaseProvider {
+  @override
   final ApiHandler api;
   MobileDataProvider({required this.api});
 
@@ -92,7 +93,7 @@ class MobileDataProvider extends BaseProvider {
 
   @override
   void addEntry(TimeTableEntry entry) {
-    if (currentTimeTable == null) return;
+    currentTimeTable ??= TimeTable(entries: <TimeTableEntry>[]);
     currentTimeTable!.addEntry(entry);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
     _persistPersonalizedIfStudent();
@@ -153,8 +154,8 @@ class MobileDataProvider extends BaseProvider {
   }
 
   Future<void> _persistPersonalizedIfStudent() async {
-    if (isTeacher == false && currentTimeTable != null) {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (currentTimeTable != null && currentTimeTable!.entries.isNotEmpty) {
       final List<Map<String, dynamic>> serialized = currentTimeTable!.entries
           .map(
             (e) => <String, dynamic>{
@@ -174,14 +175,26 @@ class MobileDataProvider extends BaseProvider {
           )
           .toList();
       await prefs.setString('personal_timetable', jsonEncode(serialized));
+      // Also save isTeacher state
+      await prefs.setBool('is_teacher', isTeacher ?? false);
+    } else {
+      // Clear if empty
+      await prefs.remove('personal_timetable');
     }
   }
 
   Future<void> restorePersonalizedIfAny() async {
-    if (isTeacher == false) {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final String? raw = prefs.getString('personal_timetable');
-      if (raw != null) {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Restore isTeacher state
+    final bool? savedIsTeacher = prefs.getBool('is_teacher');
+    if (savedIsTeacher != null) {
+      isTeacher = savedIsTeacher;
+    }
+
+    final String? raw = prefs.getString('personal_timetable');
+    if (raw != null && raw.isNotEmpty) {
+      try {
         final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
         final entries = list.map((m) {
           final Map<String, dynamic> x = Map<String, dynamic>.from(m as Map);
@@ -200,16 +213,20 @@ class MobileDataProvider extends BaseProvider {
             format: x['format'] as String,
           );
         }).toList();
-        currentTimeTable ??= TimeTable(entries: <TimeTableEntry>[]);
-        currentTimeTable!.entries = entries;
+        currentTimeTable = TimeTable(entries: entries);
         subjects = _buildSubjectsFromEntries(entries);
         notifyListeners();
+      } catch (e) {
+        // If restore fails, clear corrupted data
+        await prefs.remove('personal_timetable');
+        await prefs.remove('is_teacher');
       }
     }
   }
 }
 
 class WebDataProvider extends BaseProvider {
+  @override
   final ApiHandler api;
   WebDataProvider({required this.api});
 

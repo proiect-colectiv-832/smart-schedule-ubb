@@ -12,10 +12,8 @@ class RoleSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final BaseProvider provider = AppScope.of(context);
-    return CupertinoPageScaffold(
-      navigationBar: PlatformService.isWeb
-          ? null
-          : const CupertinoNavigationBar(middle: Text('Smart Schedule')),
+    final Widget content = CupertinoPageScaffold(
+      navigationBar: null,
       child: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
@@ -111,6 +109,11 @@ class RoleSelectionScreen extends StatelessWidget {
         ),
       ),
     );
+
+    if (!PlatformService.isWeb) {
+      return PopScope(canPop: false, child: content);
+    }
+    return content;
   }
 }
 

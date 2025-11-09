@@ -1497,4 +1497,154 @@ class ApiHandler {
     ];
     return groups;
   }
+
+  Future<List<Subject>> fetchSubjects() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Mock subjects with entries
+    return [
+      Subject(
+        id: 1,
+        name: 'Mathematics',
+        entries: [
+          TimeTableEntry(
+            id: 1001,
+            day: Day.monday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 8, minute: 0),
+              end: const TimeOfDay(hour: 10, minute: 0),
+            ),
+            subjectName: 'Mathematics',
+            teacher: TeacherName(name: 'Dr. Smith'),
+            frequency: Frequency.weekly,
+            type: Type.lecture,
+            room: 'Room 101',
+            format: 'In-person',
+          ),
+          TimeTableEntry(
+            id: 1002,
+            day: Day.wednesday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 10, minute: 0),
+              end: const TimeOfDay(hour: 12, minute: 0),
+            ),
+            subjectName: 'Mathematics',
+            teacher: TeacherName(name: 'Dr. Smith'),
+            frequency: Frequency.weekly,
+            type: Type.seminar,
+            room: 'Room 102',
+            format: 'In-person',
+          ),
+        ],
+      ),
+      Subject(
+        id: 2,
+        name: 'Computer Science',
+        entries: [
+          TimeTableEntry(
+            id: 2001,
+            day: Day.tuesday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 14, minute: 0),
+              end: const TimeOfDay(hour: 16, minute: 0),
+            ),
+            subjectName: 'Computer Science',
+            teacher: TeacherName(name: 'Prof. Johnson'),
+            frequency: Frequency.weekly,
+            type: Type.lecture,
+            room: 'Lab A',
+            format: 'In-person',
+          ),
+          TimeTableEntry(
+            id: 2002,
+            day: Day.thursday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 16, minute: 0),
+              end: const TimeOfDay(hour: 18, minute: 0),
+            ),
+            subjectName: 'Computer Science',
+            teacher: TeacherName(name: 'Prof. Johnson'),
+            frequency: Frequency.weekly,
+            type: Type.lab,
+            room: 'Lab B',
+            format: 'In-person',
+          ),
+        ],
+      ),
+      Subject(
+        id: 3,
+        name: 'Physics',
+        entries: [
+          TimeTableEntry(
+            id: 3001,
+            day: Day.monday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 12, minute: 0),
+              end: const TimeOfDay(hour: 14, minute: 0),
+            ),
+            subjectName: 'Physics',
+            teacher: TeacherName(name: 'Dr. Brown'),
+            frequency: Frequency.weekly,
+            type: Type.lecture,
+            room: 'Physics Hall',
+            format: 'In-person',
+          ),
+        ],
+      ),
+      Subject(
+        id: 4,
+        name: 'Chemistry',
+        entries: [
+          TimeTableEntry(
+            id: 4001,
+            day: Day.friday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 9, minute: 0),
+              end: const TimeOfDay(hour: 11, minute: 0),
+            ),
+            subjectName: 'Chemistry',
+            teacher: TeacherName(name: 'Dr. Wilson'),
+            frequency: Frequency.weekly,
+            type: Type.lecture,
+            room: 'Chem Lab',
+            format: 'In-person',
+          ),
+          TimeTableEntry(
+            id: 4002,
+            day: Day.friday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 11, minute: 0),
+              end: const TimeOfDay(hour: 13, minute: 0),
+            ),
+            subjectName: 'Chemistry',
+            teacher: TeacherName(name: 'Dr. Wilson'),
+            frequency: Frequency.weekly,
+            type: Type.lab,
+            room: 'Chem Lab',
+            format: 'In-person',
+          ),
+        ],
+      ),
+      Subject(
+        id: 5,
+        name: 'English Literature',
+        entries: [
+          TimeTableEntry(
+            id: 5001,
+            day: Day.wednesday,
+            interval: TimeInterval(
+              start: const TimeOfDay(hour: 14, minute: 0),
+              end: const TimeOfDay(hour: 16, minute: 0),
+            ),
+            subjectName: 'English Literature',
+            teacher: TeacherName(name: 'Prof. Davis'),
+            frequency: Frequency.weekly,
+            type: Type.seminar,
+            room: 'Room 201',
+            format: 'In-person',
+          ),
+        ],
+      ),
+    ];
+  }
 }

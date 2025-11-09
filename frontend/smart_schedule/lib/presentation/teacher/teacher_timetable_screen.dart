@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/timetable.dart';
+import 'package:smart_schedule/models/timetables.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/utils/platform_service.dart';
 
@@ -13,25 +14,65 @@ class TeacherTimeTableScreen extends StatelessWidget {
     final BaseProvider provider = AppScope.of(context);
     final List<TimeTableEntry> entries =
         provider.currentTimeTable?.entries ?? <TimeTableEntry>[];
+    final TeacherTimeTable? teacherTable =
+        provider.currentTimeTable is TeacherTimeTable
+        ? provider.currentTimeTable as TeacherTimeTable
+        : null;
+    final String teacherName =
+        teacherTable?.name.name ??
+        provider.selectedTeacher?.name ??
+        'Teacher Timetable';
 
-    return CupertinoPageScaffold(
-      navigationBar: PlatformService.isWeb
-          ? null
-          : CupertinoNavigationBar(
-              middle: const Text('My Teaching Schedule'),
-              trailing: provider.isPersonalizationEnabled
-                  ? CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      child: const Icon(CupertinoIcons.calendar),
-                      onPressed: () {},
-                    )
-                  : null,
-            ),
+    final Widget content = CupertinoPageScaffold(
+      navigationBar: null,
       child: SafeArea(
         child: Container(
           color: CupertinoColors.systemGroupedBackground,
           child: CustomScrollView(
             slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minSize: 0,
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Icon(
+                              CupertinoIcons.back,
+                              size: 28,
+                              color: CupertinoColors.systemBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              teacherName,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: CupertinoColors.black,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Teaching schedule',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: CupertinoColors.systemGrey.darkColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
                 sliver: _buildTimetableGrid(entries, provider),
@@ -41,6 +82,11 @@ class TeacherTimeTableScreen extends StatelessWidget {
         ),
       ),
     );
+
+    if (!PlatformService.isWeb) {
+      return PopScope(canPop: false, child: content);
+    }
+    return content;
   }
 
   Widget _buildTimetableGrid(
@@ -400,9 +446,10 @@ class _TeachingClassCard extends StatelessWidget {
                   ),
                   child: Text(
                     _getFrequencyLabel(entry.frequency),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
+                      color: const Color.fromARGB(255, 62, 62, 62),
                     ),
                   ),
                 ),

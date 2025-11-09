@@ -33,10 +33,8 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
     final List<Field> fields = provider.fields;
     final List<int> years = _selectedField?.years ?? <int>[];
 
-    return CupertinoPageScaffold(
-      navigationBar: PlatformService.isWeb
-          ? null
-          : const CupertinoNavigationBar(middle: Text('Select Your Program')),
+    final Widget content = CupertinoPageScaffold(
+      navigationBar: null,
       child: SafeArea(
         child: provider.isLoading
             ? const Center(child: CupertinoActivityIndicator())
@@ -57,22 +55,71 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: <Widget>[
-                              // Header
-                              const Icon(
-                                CupertinoIcons.book_fill,
-                                size: 64,
-                                color: CupertinoColors.systemBlue,
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Choose Your Field',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: CupertinoColors.black,
+                              // Header with back button
+                              if (PlatformService.isWeb)
+                                Row(
+                                  children: [
+                                    CupertinoButton(
+                                      padding: EdgeInsets.zero,
+                                      minSize: 0,
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Icon(
+                                        CupertinoIcons.back,
+                                        size: 28,
+                                        color: CupertinoColors.systemBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        'Choose Your Field',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: CupertinoColors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    CupertinoButton(
+                                      padding: EdgeInsets.zero,
+                                      minSize: 0,
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Icon(
+                                        CupertinoIcons.back,
+                                        size: 28,
+                                        color: CupertinoColors.systemBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        'Choose Your Field',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: CupertinoColors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
+                              if (!PlatformService.isWeb)
+                                const SizedBox(height: 16),
+                              if (!PlatformService.isWeb)
+                                const Icon(
+                                  CupertinoIcons.book_fill,
+                                  size: 64,
+                                  color: CupertinoColors.systemBlue,
+                                ),
                               const SizedBox(height: 8),
                               Text(
                                 'Select your field of study and academic year',
@@ -237,6 +284,11 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
               ),
       ),
     );
+
+    if (!PlatformService.isWeb) {
+      return PopScope(canPop: false, child: content);
+    }
+    return content;
   }
 }
 

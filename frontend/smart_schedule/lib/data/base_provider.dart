@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:smart_schedule/data/api_handler.dart';
 import 'package:smart_schedule/models/field.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/models/timetables.dart';
 
 abstract class BaseProvider extends ChangeNotifier {
+  ApiHandler get api;
   TimeTable? currentTimeTable;
   bool? isTeacher;
   bool isLoading = false;
