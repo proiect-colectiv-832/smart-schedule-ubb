@@ -11,15 +11,15 @@ PageRoute<T> createWebAwareRoute<T>({
   required WidgetBuilder builder,
   bool fullscreenDialog = false,
 }) {
-  if (kIsWeb && PlatformService.isWeb) {
-    // On web, use MaterialPageRoute which properly integrates with browser history
+  if (kIsWeb && PlatformService.isWeb && !PlatformService.isMobileBrowser) {
+    // On desktop web, use MaterialPageRoute which properly integrates with browser history
     // The UI still uses Cupertino widgets, so the styling is preserved
     return material.MaterialPageRoute<T>(
       builder: builder,
       fullscreenDialog: fullscreenDialog,
     );
   } else {
-    // On mobile, use NoSwipePageRoute to completely disable swipe gestures
+    // On mobile (PWA, native, or mobile browser), use NoSwipePageRoute to completely disable swipe gestures
     return NoSwipePageRoute<T>(
       builder: builder,
       fullscreenDialog: fullscreenDialog,

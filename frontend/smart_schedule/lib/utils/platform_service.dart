@@ -27,4 +27,20 @@ class PlatformService {
       return false;
     }
   }
+
+  static bool get isMobileBrowser {
+    if (!kIsWeb) return false;
+    // Check if on mobile device but NOT standalone (i.e., in browser like Safari)
+    try {
+      final ua = html.window.navigator.userAgent.toLowerCase();
+      final isMobileDevice =
+          ua.contains('iphone') ||
+          ua.contains('ipad') ||
+          ua.contains('ipod') ||
+          ua.contains('android');
+      return isMobileDevice && !isStandalonePwa;
+    } catch (_) {
+      return false;
+    }
+  }
 }

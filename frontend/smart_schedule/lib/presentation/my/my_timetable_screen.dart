@@ -137,7 +137,10 @@ class _PersonalizedBody extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 CupertinoButton.filled(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 24,
+                  ),
                   borderRadius: BorderRadius.circular(10),
                   onPressed: () {
                     Navigator.of(context).push(
@@ -148,11 +151,7 @@ class _PersonalizedBody extends StatelessWidget {
                   },
                   child: const Text(
                     'Add Subjects',
-                    style: TextStyle(
-                      color: CupertinoColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],

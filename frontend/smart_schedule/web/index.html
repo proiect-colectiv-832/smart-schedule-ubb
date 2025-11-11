@@ -37,8 +37,46 @@
 
   <title>Smart Schedule PWA</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    /* Disable swipe-to-navigate gestures on mobile browsers */
+    body {
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    html {
+      overscroll-behavior: none;
+    }
+  </style>
 </head>
 <body>
+  <script>
+    // Disable browser back/forward swipe gestures
+    let touchStartX = 0;
+    let touchStartY = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: false });
+    
+    document.addEventListener('touchmove', function(e) {
+      const touchX = e.touches[0].clientX;
+      const touchY = e.touches[0].clientY;
+      const deltaX = touchX - touchStartX;
+      const deltaY = touchY - touchStartY;
+      
+      // Prevent horizontal swipe from edges (back/forward gesture)
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal swipe detected
+        if ((touchStartX < 50 && deltaX > 0) || // Swipe from left edge
+            (touchStartX > window.innerWidth - 50 && deltaX < 0)) { // Swipe from right edge
+          e.preventDefault();
+        }
+      }
+    }, { passive: false });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
   <script>
     // Register service worker for PWA functionality

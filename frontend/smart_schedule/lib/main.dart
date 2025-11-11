@@ -58,9 +58,15 @@ class MyApp extends StatelessWidget {
           ),
         ),
         builder: (BuildContext context, Widget? child) {
-          return AppScope(
-            notifier: provider,
-            child: child ?? const SizedBox.shrink(),
+          return DefaultTextStyle(
+            style: const TextStyle(
+              decoration: TextDecoration.none,
+              color: CupertinoColors.black,
+            ),
+            child: AppScope(
+              notifier: provider,
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
         home: CustomTabScaffold(

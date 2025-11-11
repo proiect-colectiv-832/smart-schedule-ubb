@@ -201,9 +201,7 @@ class TeacherTimeTableScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: _TeachingClassCard(
                       entry: entry,
-                      onDelete: provider.isPersonalizationEnabled
-                          ? () => provider.removeEntry(entry.id)
-                          : null,
+                      onDelete: null, // Teachers can only view, not delete
                     ),
                   ),
                 ),
