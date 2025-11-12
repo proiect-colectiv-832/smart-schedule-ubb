@@ -7,8 +7,8 @@ import {
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash,
-} from './src/timetable-parser';
-import { Timetable, TimetableEntry } from './src/types';
+} from './timetable-parser';
+import { Timetable, TimetableEntry } from './types';
 import {
   initializeCache,
   getAllFields,
@@ -17,7 +17,7 @@ import {
   getSubject,
   searchSubjects,
   getCacheStats
-} from './src/cache-manager';
+} from './cache-manager';
 import {
   createNotification,
   getNotifications,
@@ -28,9 +28,9 @@ import {
   getNotificationStats,
   createScheduleChangeNotification,
   cleanupExpiredNotifications
-} from './src/notification-manager';
-import { NotificationType, NotificationPriority } from './src/notification-types';
-import { PushNotificationManager } from './src/push-notification-manager';
+} from './notification-manager';
+import { NotificationType, NotificationPriority } from './notification-types';
+import { PushNotificationManager } from './push-notification-manager';
 
 const app = express();
 const server = http.createServer(app);
