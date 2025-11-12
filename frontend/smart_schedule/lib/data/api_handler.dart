@@ -1,1650 +1,274 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:smart_schedule/models/field.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/models/timetables.dart';
 
 class ApiHandler {
+  static const String baseUrl = 'http://localhost:3000';
   const ApiHandler();
 
+  // Helper method to parse day string to Day enum
+  Day _parseDay(String dayStr) {
+    switch (dayStr.toLowerCase()) {
+      case 'monday':
+        return Day.monday;
+      case 'tuesday':
+        return Day.tuesday;
+      case 'wednesday':
+        return Day.wednesday;
+      case 'thursday':
+        return Day.thursday;
+      case 'friday':
+        return Day.friday;
+      case 'saturday':
+        return Day.saturday;
+      case 'sunday':
+        return Day.sunday;
+      default:
+        return Day.monday;
+    }
+  }
+
+  // Helper method to parse frequency string to Frequency enum
+  Frequency _parseFrequency(String freqStr) {
+    switch (freqStr.toLowerCase()) {
+      case 'weekly':
+        return Frequency.weekly;
+      case 'oddweeks':
+        return Frequency.oddweeks;
+      case 'evenweeks':
+        return Frequency.evenweeks;
+      default:
+        return Frequency.weekly;
+    }
+  }
+
+  // Helper method to parse type string to Type enum
+  Type _parseType(String typeStr) {
+    switch (typeStr.toLowerCase()) {
+      case 'lecture':
+        return Type.lecture;
+      case 'seminar':
+        return Type.seminar;
+      case 'lab':
+        return Type.lab;
+      case 'other':
+        return Type.other;
+      default:
+        return Type.lecture;
+    }
+  }
+
+  // Helper method to parse timetable entry from JSON
+  TimeTableEntry _parseTimeTableEntry(Map<String, dynamic> json) {
+    final interval = json['interval'] as Map<String, dynamic>;
+    final start = interval['start'] as Map<String, dynamic>;
+    final end = interval['end'] as Map<String, dynamic>;
+
+    return TimeTableEntry(
+      id: json['id'] as int,
+      day: _parseDay(json['day'] as String),
+      interval: TimeInterval(
+        start: TimeOfDay(
+          hour: start['hour'] as int,
+          minute: start['minute'] as int,
+        ),
+        end: TimeOfDay(hour: end['hour'] as int, minute: end['minute'] as int),
+      ),
+      subjectName: json['subjectName'] as String,
+      teacher: TeacherName(name: json['teacher'] as String),
+      frequency: _parseFrequency(json['frequency'] as String),
+      type: _parseType(json['type'] as String),
+      room: json['room'] as String? ?? '',
+      format: json['format'] as String? ?? 'In-person',
+    );
+  }
+
   Future<List<TeacherName>> fetchTeachers() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return <TeacherName>[
-      TeacherName(name: 'Alice Johnson'),
-      TeacherName(name: 'Bob Smith'),
-      TeacherName(name: 'Carol Lee'),
-      TeacherName(name: 'David Martinez'),
-      TeacherName(name: 'Emma Wilson'),
-      TeacherName(name: 'Frank Thompson'),
-      TeacherName(name: 'Grace Chen'),
-      TeacherName(name: 'Henry Davis'),
-      TeacherName(name: 'Iris Rodriguez'),
-      TeacherName(name: 'Jack Anderson'),
-      TeacherName(name: 'Karen White'),
-      TeacherName(name: 'Leo Brown'),
-      TeacherName(name: 'Maria Garcia'),
-      TeacherName(name: 'Nathan Taylor'),
-      TeacherName(name: 'Olivia Moore'),
-      TeacherName(name: 'Peter Jackson'),
-      TeacherName(name: 'Quinn Harris'),
-      TeacherName(name: 'Rachel Martin'),
-      TeacherName(name: 'Samuel Clark'),
-      TeacherName(name: 'Tina Lewis'),
-    ];
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/teachers'));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList =
+            jsonDecode(response.body) as List<dynamic>;
+        return jsonList
+            .map((json) => TeacherName(name: json['name'] as String))
+            .toList();
+      } else {
+        throw Exception('Failed to load teachers: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching teachers: $e');
+    }
   }
 
   Future<TeacherTimeTable> fetchTeacherTimeTable({
     required TeacherName teacher,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    final List<TimeTableEntry> entries = <TimeTableEntry>[
-      TimeTableEntry(
-        id: 1,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Algorithms',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'A101',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 2,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Operating Systems',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'A102',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 3,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Computer Networks',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 5',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 4,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Database Systems',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'B201',
-        format: 'Online',
-      ),
-      TimeTableEntry(
-        id: 5,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Software Engineering',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'C301',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 6,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Artificial Intelligence',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'C302',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 7,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Machine Learning',
-        teacher: teacher,
-        frequency: Frequency.oddweeks,
-        type: Type.lab,
-        room: 'Lab 3',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 8,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Web Development',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 1',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 9,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Data Structures',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'B203',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 10,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 12, minute: 0),
-          end: const TimeOfDay(hour: 14, minute: 0),
-        ),
-        subjectName: 'Computer Graphics',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'A105',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 11,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Cybersecurity',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'D401',
-        format: 'Online',
-      ),
-      TimeTableEntry(
-        id: 12,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Cloud Computing',
-        teacher: teacher,
-        frequency: Frequency.oddweeks,
-        type: Type.seminar,
-        room: 'D402',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 13,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Theory of Computation',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'E501',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 14,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Compiler Design',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'E502',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 15,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Mobile Development',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 2',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 16,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Distributed Systems',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'F601',
-        format: 'Online',
-      ),
-      TimeTableEntry(
-        id: 17,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Data Mining',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'F602',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 18,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Human-Computer Interaction',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'G701',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 19,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Blockchain Technology',
-        teacher: teacher,
-        frequency: Frequency.oddweeks,
-        type: Type.lecture,
-        room: 'G702',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 20,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Internet of Things',
-        teacher: teacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 4',
-        format: 'On-site',
-      ),
-    ];
-    return TeacherTimeTable(name: teacher, entries: entries);
+    try {
+      final encodedTeacherName = Uri.encodeComponent(teacher.name);
+      final response = await http.get(
+        Uri.parse('$baseUrl/teacher/$encodedTeacherName/timetable'),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> json =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        final List<dynamic> entriesJson = json['entries'] as List<dynamic>;
+
+        final List<TimeTableEntry> entries = entriesJson
+            .map(
+              (entryJson) =>
+                  _parseTimeTableEntry(entryJson as Map<String, dynamic>),
+            )
+            .toList();
+
+        return TeacherTimeTable(name: teacher, entries: entries);
+      } else if (response.statusCode == 404) {
+        // Return empty timetable if teacher not found
+        return TeacherTimeTable(name: teacher, entries: <TimeTableEntry>[]);
+      } else {
+        throw Exception(
+          'Failed to load teacher timetable: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching teacher timetable: $e');
+    }
   }
 
   Future<List<Field>> fetchFields() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return <Field>[
-      Field(name: 'Computer Science', id: 1, years: <int>[1, 2, 3]),
-      Field(name: 'Mathematics', id: 2, years: <int>[1, 2, 3]),
-      Field(name: 'Physics', id: 3, years: <int>[1, 2, 3]),
-    ];
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/fields'));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList =
+            jsonDecode(response.body) as List<dynamic>;
+        return jsonList
+            .map(
+              (json) => Field(
+                id: json['id'] as int,
+                name: json['name'] as String,
+                years: (json['years'] as List<dynamic>)
+                    .map((y) => y as int)
+                    .toList(),
+              ),
+            )
+            .toList();
+      } else {
+        throw Exception('Failed to load fields: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching fields: $e');
+    }
   }
 
   Future<StudentTimeTable> fetchStudentTimeTable({
     required Field field,
     required int year,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    final TeacherName placeholderTeacher = TeacherName(name: 'Staff');
-    final List<TimeTableEntry> entries = <TimeTableEntry>[
-      TimeTableEntry(
-        id: 101,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Programming I',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'A101',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 102,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Linear Algebra',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'C105',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 103,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Physics',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 6',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 104,
-        day: Day.monday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'English Language',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'B105',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 105,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Data Structures',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'A102',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 106,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Programming I',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 2',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 107,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Calculus',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'C201',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 108,
-        day: Day.tuesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Computer Architecture',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'D301',
-        format: 'Online',
-      ),
-      TimeTableEntry(
-        id: 109,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Discrete Mathematics',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'E401',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 110,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Logic Design',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'E402',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 111,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Web Technologies',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 1',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 112,
-        day: Day.wednesday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Statistics',
-        teacher: placeholderTeacher,
-        frequency: Frequency.oddweeks,
-        type: Type.seminar,
-        room: 'F501',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 113,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Object-Oriented Programming',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'A201',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 114,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Algorithms',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'A202',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 115,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Data Structures',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 3',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 116,
-        day: Day.thursday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Operating Systems',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'B301',
-        format: 'Online',
-      ),
-      TimeTableEntry(
-        id: 117,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 8, minute: 0),
-          end: const TimeOfDay(hour: 10, minute: 0),
-        ),
-        subjectName: 'Software Engineering',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lecture,
-        room: 'C401',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 118,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 10, minute: 0),
-          end: const TimeOfDay(hour: 12, minute: 0),
-        ),
-        subjectName: 'Database Management',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.seminar,
-        room: 'C402',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 119,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 14, minute: 0),
-          end: const TimeOfDay(hour: 16, minute: 0),
-        ),
-        subjectName: 'Computer Networks',
-        teacher: placeholderTeacher,
-        frequency: Frequency.weekly,
-        type: Type.lab,
-        room: 'Lab 5',
-        format: 'On-site',
-      ),
-      TimeTableEntry(
-        id: 120,
-        day: Day.friday,
-        interval: TimeInterval(
-          start: const TimeOfDay(hour: 16, minute: 0),
-          end: const TimeOfDay(hour: 18, minute: 0),
-        ),
-        subjectName: 'Project Management',
-        teacher: placeholderTeacher,
-        frequency: Frequency.oddweeks,
-        type: Type.seminar,
-        room: 'D501',
-        format: 'On-site',
-      ),
-    ];
-    return StudentTimeTable(
-      field: field,
-      year: year,
-      groupName: 'Group A',
-      entries: entries,
-    );
+    try {
+      // First, fetch all timetables for this field/year
+      final timetables = await fetchFieldYearTimeTables(
+        field: field,
+        year: year,
+      );
+
+      // Return the first timetable (or empty if none)
+      if (timetables.isNotEmpty) {
+        return timetables.first;
+      } else {
+        return StudentTimeTable(
+          field: field,
+          year: year,
+          groupName: 'Unknown',
+          entries: <TimeTableEntry>[],
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching student timetable: $e');
+    }
   }
 
   Future<List<StudentTimeTable>> fetchFieldYearTimeTables({
     required Field field,
     required int year,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    final TeacherName staff = TeacherName(name: 'Staff');
-    List<StudentTimeTable> groups = <StudentTimeTable>[
-      StudentTimeTable(
-        field: field,
-        year: year,
-        groupName: 'Group A',
-        entries: <TimeTableEntry>[
-          TimeTableEntry(
-            id: 201,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Programming I',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A101',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 202,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Linear Algebra',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C105',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 203,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Physics',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 6',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 204,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'English Language',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'B105',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 205,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Data Structures',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A102',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 206,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Programming I',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 2',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 207,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Calculus',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'C201',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 208,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Computer Architecture',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'D301',
-            format: 'Online',
-          ),
-          TimeTableEntry(
-            id: 209,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Discrete Mathematics',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'E401',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 210,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Logic Design',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'E402',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 211,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Web Technologies',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 1',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 212,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Statistics',
-            teacher: staff,
-            frequency: Frequency.oddweeks,
-            type: Type.seminar,
-            room: 'F501',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 213,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Object-Oriented Programming',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A201',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 214,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Algorithms',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'A202',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 215,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Data Structures',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 3',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 216,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Operating Systems',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'B301',
-            format: 'Online',
-          ),
-          TimeTableEntry(
-            id: 217,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Software Engineering',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C401',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 218,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Database Management',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'C402',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 219,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Computer Networks',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 5',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 220,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Project Management',
-            teacher: staff,
-            frequency: Frequency.evenweeks,
-            type: Type.seminar,
-            room: 'D501',
-            format: 'On-site',
-          ),
-        ],
-      ),
-      StudentTimeTable(
-        field: field,
-        year: year,
-        groupName: 'Group B',
-        entries: <TimeTableEntry>[
-          TimeTableEntry(
-            id: 301,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Introduction to CS',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'B101',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 302,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Calculus II',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C106',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 303,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Chemistry',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 7',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 304,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Technical Writing',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'B106',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 305,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Advanced Algorithms',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A103',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 306,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Programming II',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 8',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 307,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Probability Theory',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'C202',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 308,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Digital Logic',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'D302',
-            format: 'Online',
-          ),
-          TimeTableEntry(
-            id: 309,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Graph Theory',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'E403',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 310,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'FPGA Design',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'E403',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 311,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Frontend Development',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 9',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 312,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Applied Statistics',
-            teacher: staff,
-            frequency: Frequency.evenweeks,
-            type: Type.seminar,
-            room: 'F502',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 313,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Functional Programming',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A203',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 314,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Design Patterns',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'A204',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 315,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Database Design',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 4',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 316,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'System Programming',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'B302',
-            format: 'Online',
-          ),
-          TimeTableEntry(
-            id: 317,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Agile Development',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C403',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 318,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'NoSQL Databases',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'C404',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 319,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Network Security',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 6',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 320,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Team Leadership',
-            teacher: staff,
-            frequency: Frequency.oddweeks,
-            type: Type.seminar,
-            room: 'D502',
-            format: 'On-site',
-          ),
-        ],
-      ),
-      StudentTimeTable(
-        field: field,
-        year: year,
-        groupName: 'Group C',
-        entries: <TimeTableEntry>[
-          TimeTableEntry(
-            id: 401,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Assembly Language',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C101',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 402,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Differential Equations',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C107',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 403,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Electronics',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 10',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 404,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Business Communication',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'B107',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 405,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Parallel Computing',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A104',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 406,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Python Programming',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 11',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 407,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Numerical Methods',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'C203',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 408,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Embedded Systems',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'D303',
-            format: 'Online',
-          ),
-          TimeTableEntry(
-            id: 409,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Combinatorics',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'E404',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 410,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'VLSI Design',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'E404',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 411,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Backend Development',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 12',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 412,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Data Analysis',
-            teacher: staff,
-            frequency: Frequency.oddweeks,
-            type: Type.seminar,
-            room: 'F503',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 413,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Scripting Languages',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'A205',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 414,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Software Testing',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'A206',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 415,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'SQL Advanced',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 7',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 416,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Linux Administration',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'B303',
-            format: 'Online',
-          ),
-          TimeTableEntry(
-            id: 417,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'DevOps Practices',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'C405',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 418,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Cloud Architecture',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'C406',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 419,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Penetration Testing',
-            teacher: staff,
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab 8',
-            format: 'On-site',
-          ),
-          TimeTableEntry(
-            id: 420,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Innovation Workshop',
-            teacher: staff,
-            frequency: Frequency.evenweeks,
-            type: Type.seminar,
-            room: 'D503',
-            format: 'On-site',
-          ),
-        ],
-      ),
-    ];
-    return groups;
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/field/${field.id}/year/$year/timetables'),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList =
+            jsonDecode(response.body) as List<dynamic>;
+        return jsonList.map((json) {
+          final fieldJson = json['field'] as Map<String, dynamic>;
+          final fieldObj = Field(
+            id: fieldJson['id'] as int,
+            name: fieldJson['name'] as String,
+            years: (fieldJson['years'] as List<dynamic>)
+                .map((y) => y as int)
+                .toList(),
+          );
+
+          final List<dynamic> entriesJson = json['entries'] as List<dynamic>;
+          final List<TimeTableEntry> entries = entriesJson
+              .map(
+                (entryJson) =>
+                    _parseTimeTableEntry(entryJson as Map<String, dynamic>),
+              )
+              .toList();
+
+          return StudentTimeTable(
+            field: fieldObj,
+            year: json['year'] as int,
+            groupName: json['groupName'] as String,
+            entries: entries,
+          );
+        }).toList();
+      } else if (response.statusCode == 404) {
+        // Return empty list if not found
+        return <StudentTimeTable>[];
+      } else {
+        throw Exception(
+          'Failed to load field/year timetables: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching field/year timetables: $e');
+    }
   }
 
   Future<List<Subject>> fetchSubjects() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/subjects'));
 
-    // Mock subjects with entries
-    return [
-      Subject(
-        id: 1,
-        name: 'Mathematics',
-        entries: [
-          TimeTableEntry(
-            id: 1001,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 8, minute: 0),
-              end: const TimeOfDay(hour: 10, minute: 0),
-            ),
-            subjectName: 'Mathematics',
-            teacher: TeacherName(name: 'Dr. Smith'),
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'Room 101',
-            format: 'In-person',
-          ),
-          TimeTableEntry(
-            id: 1002,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 10, minute: 0),
-              end: const TimeOfDay(hour: 12, minute: 0),
-            ),
-            subjectName: 'Mathematics',
-            teacher: TeacherName(name: 'Dr. Smith'),
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'Room 102',
-            format: 'In-person',
-          ),
-        ],
-      ),
-      Subject(
-        id: 2,
-        name: 'Computer Science',
-        entries: [
-          TimeTableEntry(
-            id: 2001,
-            day: Day.tuesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'Computer Science',
-            teacher: TeacherName(name: 'Prof. Johnson'),
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'Lab A',
-            format: 'In-person',
-          ),
-          TimeTableEntry(
-            id: 2002,
-            day: Day.thursday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 16, minute: 0),
-              end: const TimeOfDay(hour: 18, minute: 0),
-            ),
-            subjectName: 'Computer Science',
-            teacher: TeacherName(name: 'Prof. Johnson'),
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Lab B',
-            format: 'In-person',
-          ),
-        ],
-      ),
-      Subject(
-        id: 3,
-        name: 'Physics',
-        entries: [
-          TimeTableEntry(
-            id: 3001,
-            day: Day.monday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 12, minute: 0),
-              end: const TimeOfDay(hour: 14, minute: 0),
-            ),
-            subjectName: 'Physics',
-            teacher: TeacherName(name: 'Dr. Brown'),
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'Physics Hall',
-            format: 'In-person',
-          ),
-        ],
-      ),
-      Subject(
-        id: 4,
-        name: 'Chemistry',
-        entries: [
-          TimeTableEntry(
-            id: 4001,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 9, minute: 0),
-              end: const TimeOfDay(hour: 11, minute: 0),
-            ),
-            subjectName: 'Chemistry',
-            teacher: TeacherName(name: 'Dr. Wilson'),
-            frequency: Frequency.weekly,
-            type: Type.lecture,
-            room: 'Chem Lab',
-            format: 'In-person',
-          ),
-          TimeTableEntry(
-            id: 4002,
-            day: Day.friday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 11, minute: 0),
-              end: const TimeOfDay(hour: 13, minute: 0),
-            ),
-            subjectName: 'Chemistry',
-            teacher: TeacherName(name: 'Dr. Wilson'),
-            frequency: Frequency.weekly,
-            type: Type.lab,
-            room: 'Chem Lab',
-            format: 'In-person',
-          ),
-        ],
-      ),
-      Subject(
-        id: 5,
-        name: 'English Literature',
-        entries: [
-          TimeTableEntry(
-            id: 5001,
-            day: Day.wednesday,
-            interval: TimeInterval(
-              start: const TimeOfDay(hour: 14, minute: 0),
-              end: const TimeOfDay(hour: 16, minute: 0),
-            ),
-            subjectName: 'English Literature',
-            teacher: TeacherName(name: 'Prof. Davis'),
-            frequency: Frequency.weekly,
-            type: Type.seminar,
-            room: 'Room 201',
-            format: 'In-person',
-          ),
-        ],
-      ),
-    ];
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList =
+            jsonDecode(response.body) as List<dynamic>;
+        return jsonList.map((json) {
+          final List<dynamic> entriesJson = json['entries'] as List<dynamic>;
+          final List<TimeTableEntry> entries = entriesJson
+              .map(
+                (entryJson) =>
+                    _parseTimeTableEntry(entryJson as Map<String, dynamic>),
+              )
+              .toList();
+
+          return Subject(
+            id: json['id'] as int,
+            name: json['name'] as String,
+            entries: entries,
+          );
+        }).toList();
+      } else {
+        throw Exception('Failed to load subjects: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching subjects: $e');
+    }
   }
 }
