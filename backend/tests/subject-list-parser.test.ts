@@ -5,7 +5,7 @@ import {
     searchCoursesByCode,
     groupCoursesByNameInitial,
     CourseInfo,
-} from './subject-list-parser';
+} from '../src/subject-list-parser';
 
 // Mock axios
 jest.mock('axios');
