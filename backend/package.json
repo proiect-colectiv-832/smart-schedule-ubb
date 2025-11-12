@@ -4,7 +4,7 @@
   "description": "UBB Timetable Parser API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node src/server.ts",
+    "dev": "ts-node server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "jest",
