@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart' show TimeOfDay;
+import 'package:overlay_support/overlay_support.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_schedule/data/api_handler.dart';
 import 'package:smart_schedule/data/base_provider.dart';
@@ -98,15 +99,21 @@ class MobileDataProvider extends BaseProvider {
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
     _persistPersonalizedIfStudent();
     notifyListeners();
+    toast('${entry.subjectName} added to your timetable');
   }
 
   @override
   void removeEntry(int id) {
     if (currentTimeTable == null) return;
+    final entry = currentTimeTable!.entries.firstWhere(
+      (e) => e.id == id,
+      orElse: () => throw StateError('Entry not found'),
+    );
     currentTimeTable!.removeEntry(id);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
     _persistPersonalizedIfStudent();
     notifyListeners();
+    toast('${entry.subjectName} removed from your timetable');
   }
 
   @override
@@ -120,11 +127,14 @@ class MobileDataProvider extends BaseProvider {
 
   @override
   void addSubject(Subject subject) {
-    if (currentTimeTable == null) return;
+    currentTimeTable ??= TimeTable(entries: <TimeTableEntry>[]);
     currentTimeTable!.addSubject(subject);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
     _persistPersonalizedIfStudent();
     notifyListeners();
+    toast(
+      '${subject.entries.length} ${subject.entries.length == 1 ? 'class' : 'classes'} from ${subject.name} added to your timetable',
+    );
   }
 
   @override
@@ -136,6 +146,9 @@ class MobileDataProvider extends BaseProvider {
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
     _persistPersonalizedIfStudent();
     notifyListeners();
+    toast(
+      '${timetable.entries.length} ${timetable.entries.length == 1 ? 'class' : 'classes'} imported to your timetable',
+    );
   }
 
   List<Subject> _buildSubjectsFromEntries(List<TimeTableEntry> entries) {

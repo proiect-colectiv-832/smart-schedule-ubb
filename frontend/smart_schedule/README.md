@@ -450,23 +450,3 @@ Error response format:
 ```
 
 ---
-
-## Getting Started with Development
-
-This project uses Flutter. To run the application:
-
-```bash
-# Install dependencies
-flutter pub get
-
-# Run on web
-flutter run -d chrome
-
-# Build for web
-flutter build web
-
-# Run on mobile
-flutter run
-```
-
-For more information about Flutter development, visit the [official documentation](https://docs.flutter.dev/).
