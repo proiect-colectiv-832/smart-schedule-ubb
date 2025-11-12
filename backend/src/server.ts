@@ -7,7 +7,7 @@ import {
   exportToJson,
   createTimetableHash,
 } from './timetable-parser';
-import { Timetable } from './types';
+import { Timetable, TimetableEntry } from './types';
 import {
   initializeCache,
   getAllFields,
@@ -38,6 +38,90 @@ const PORT = process.env.PORT || 3000;
 // Initialize push notification manager
 let pushManager: PushNotificationManager;
 
+// Helper function to transform timetable entry to frontend format
+function transformTimetableEntry(entry: TimetableEntry, id: number) {
+  // Parse hours (e.g., "8-10" or "8:00-10:00")
+  const parseTime = (hourStr: string) => {
+    const match = hourStr.match(/(\d+):?(\d*)/);
+    if (match) {
+      return {
+        hour: parseInt(match[1]),
+        minute: match[2] ? parseInt(match[2]) : 0
+      };
+    }
+    return { hour: 8, minute: 0 };
+  };
+
+  const hours = entry.hours.split('-');
+  const startTime = parseTime(hours[0] || '8');
+  const endTime = parseTime(hours[1] || '10');
+
+  // Normalize day name to lowercase English
+  const dayMap: Record<string, string> = {
+    'luni': 'monday',
+    'marti': 'tuesday',
+    'marți': 'tuesday',
+    'miercuri': 'wednesday',
+    'joi': 'thursday',
+    'vineri': 'friday',
+    'sambata': 'saturday',
+    'sâmbătă': 'saturday',
+    'duminica': 'sunday',
+    'duminică': 'sunday',
+    'monday': 'monday',
+    'tuesday': 'tuesday',
+    'wednesday': 'wednesday',
+    'thursday': 'thursday',
+    'friday': 'friday',
+    'saturday': 'saturday',
+    'sunday': 'sunday'
+  };
+
+  // Normalize frequency
+  const frequencyMap: Record<string, string> = {
+    'sapt': 'weekly',
+    'săpt': 'weekly',
+    'weekly': 'weekly',
+    's1': 'oddweeks',
+    's2': 'evenweeks',
+    'odd': 'oddweeks',
+    'even': 'evenweeks',
+    'oddweeks': 'oddweeks',
+    'evenweeks': 'evenweeks'
+  };
+
+  // Normalize type
+  const typeMap: Record<string, string> = {
+    'curs': 'lecture',
+    'c': 'lecture',
+    'lecture': 'lecture',
+    'seminar': 'seminar',
+    's': 'seminar',
+    'laborator': 'lab',
+    'lab': 'lab',
+    'l': 'lab'
+  };
+
+  const day = dayMap[entry.day?.toLowerCase()] || 'monday';
+  const frequency = frequencyMap[entry.frequency?.toLowerCase()] || 'weekly';
+  const type = typeMap[entry.type?.toLowerCase()] || 'lecture';
+
+  return {
+    id,
+    day,
+    interval: {
+      start: startTime,
+      end: endTime
+    },
+    subjectName: entry.subject || 'Unknown',
+    teacher: entry.teacher || 'Unknown',
+    frequency,
+    type,
+    room: entry.room || '',
+    format: 'In-person'
+  };
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -47,43 +131,48 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/', (req: Request, res: Response) => {
   res.json({
     name: 'UBB Timetable Parser API',
-    version: '1.0.0',
-    description: 'REST API for parsing UBB Cluj timetable HTML pages',
-    endpoints: {
+    version: '2.0.0',
+    description: 'REST API for UBB Cluj timetable management - Frontend Compatible',
+    mainEndpoints: {
+      'GET /teachers': 'Get list of all teachers',
+      'GET /fields': 'Get all fields/specializations with years',
+      'GET /teacher/{teacherName}/timetable': 'Get teacher\'s timetable',
+      'GET /field/{fieldId}/year/{year}/timetables': 'Get all group timetables for a field and year',
+      'GET /subjects': 'Get all subjects with their entries',
+    },
+    additionalEndpoints: {
       'GET /': 'API documentation (this page)',
       'GET /health': 'Health check endpoint',
       'GET /cache/stats': 'Get cache statistics',
-      'GET /fields': 'Get all cached fields',
       'GET /fields/:name': 'Get specific field by name',
-      'GET /subjects': 'Get all cached subjects',
       'GET /subjects/:name': 'Get specific subject by name',
       'GET /subjects/search': 'Search subjects by name (requires ?q=searchTerm)',
       'POST /cache/refresh': 'Manually refresh cache',
       'GET /parse': 'Parse a single timetable (requires ?url=<timetable_url>)',
       'POST /parse-multiple': 'Parse multiple timetables (requires JSON body with urls array)',
       'GET /example-urls': 'Get example timetable URLs',
-      'GET /notifications': 'Get notifications (supports query params: userId, type, read, priority, limit, offset)',
+      'GET /notifications': 'Get notifications',
       'POST /notifications': 'Create a new notification',
       'GET /notifications/:id': 'Get specific notification by ID',
       'PUT /notifications/:id/read': 'Mark notification as read',
-      'PUT /notifications/read-all': 'Mark all notifications as read for a user (requires userId in body)',
+      'PUT /notifications/read-all': 'Mark all notifications as read',
       'DELETE /notifications/:id': 'Delete a notification',
-      'GET /notifications/stats': 'Get notification statistics (supports ?userId=)',
+      'GET /notifications/stats': 'Get notification statistics',
       'POST /notifications/schedule-change': 'Create schedule change notification',
-      'GET /push/vapid-public-key': 'Get VAPID public key for web push subscriptions',
+      'GET /push/vapid-public-key': 'Get VAPID public key for web push',
       'POST /push/subscribe': 'Subscribe to push notifications',
       'POST /push/unsubscribe': 'Unsubscribe from push notifications',
       'GET /push/stats': 'Get push notification statistics',
       'POST /push/send': 'Send push notification to specific users',
-      'POST /push/broadcast': 'Broadcast notification to all connected users',
+      'POST /push/broadcast': 'Broadcast notification to all users',
     },
-    usage: {
+    exampleUsage: {
+      teachers: 'GET /teachers',
       fields: 'GET /fields',
+      teacherTimetable: 'GET /teacher/Prof.%20John%20Smith/timetable',
+      fieldYearTimetables: 'GET /field/1/year/2/timetables',
       subjects: 'GET /subjects',
       searchSubjects: 'GET /subjects/search?q=programare',
-      cacheStats: 'GET /cache/stats',
-      singleParse: 'GET /parse?url=https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html',
-      multipleParse: 'POST /parse-multiple with body: { "urls": ["url1", "url2"] }',
     },
   });
 });
@@ -136,26 +225,22 @@ app.post('/cache/refresh', async (req: Request, res: Response) => {
   }
 });
 
-// Get all fields
+// Get all fields - matches frontend API spec
 app.get('/fields', async (req: Request, res: Response) => {
   try {
     const fields = await getAllFields();
 
-    res.json({
-      success: true,
-      data: {
-        fields: fields.map(field => ({
-          name: field.name,
-          years: field.years,
-          yearLinks: Object.fromEntries(field.yearLinks),
-        })),
-        totalFields: fields.length,
-      },
-    });
+    // Return array of fields with id, name, and years
+    const fieldsData = fields.map((field, index) => ({
+      id: index + 1,
+      name: field.name,
+      years: field.years,
+    }));
+
+    res.json(fieldsData);
   } catch (error: any) {
     console.error('Error loading fields:', error);
     res.status(500).json({
-      success: false,
       error: 'Failed to load fields',
       message: error.message || 'Unknown error occurred',
     });
@@ -194,26 +279,24 @@ app.get('/fields/:name', async (req: Request, res: Response) => {
   }
 });
 
-// Get all subjects
+// Get all subjects - matches frontend API spec
 app.get('/subjects', async (req: Request, res: Response) => {
   try {
     const subjects = await getAllSubjects();
 
-    res.json({
-      success: true,
-      data: {
-        subjects: subjects.map(subject => ({
-          name: subject.name,
-          code: subject.code,
-          entriesCount: subject.timetableEntries.length,
-        })),
-        totalSubjects: subjects.length,
-      },
-    });
+    // Transform subjects to match frontend format
+    const subjectsData = subjects.map((subject, index) => ({
+      id: index + 1,
+      name: subject.name,
+      entries: subject.timetableEntries.map((entry, entryIndex) =>
+        transformTimetableEntry(entry, (index + 1) * 1000 + entryIndex)
+      )
+    }));
+
+    res.json(subjectsData);
   } catch (error: any) {
     console.error('Error loading subjects:', error);
     res.status(500).json({
-      success: false,
       error: 'Failed to load subjects',
       message: error.message || 'Unknown error occurred',
     });
@@ -285,6 +368,152 @@ app.get('/subjects/search', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to search subjects',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get all teachers - matches frontend API spec
+app.get('/teachers', async (req: Request, res: Response) => {
+  try {
+    const subjects = await getAllSubjects();
+
+    // Extract unique teacher names from all subjects
+    const teacherSet = new Set<string>();
+    subjects.forEach(subject => {
+      subject.timetableEntries.forEach(entry => {
+        if (entry.teacher && entry.teacher.trim() !== '') {
+          teacherSet.add(entry.teacher.trim());
+        }
+      });
+    });
+
+    // Convert to array and return as objects with name property
+    const teachers = Array.from(teacherSet)
+      .sort()
+      .map(name => ({ name }));
+
+    res.json(teachers);
+  } catch (error: any) {
+    console.error('Error loading teachers:', error);
+    res.status(500).json({
+      error: 'Failed to load teachers',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get teacher timetable - matches frontend API spec
+app.get('/teacher/:teacherName/timetable', async (req: Request, res: Response) => {
+  try {
+    const teacherName = decodeURIComponent(req.params.teacherName);
+    const subjects = await getAllSubjects();
+
+    // Find all entries for this teacher
+    const teacherEntries: any[] = [];
+    let entryId = 1;
+
+    subjects.forEach(subject => {
+      subject.timetableEntries.forEach(entry => {
+        if (entry.teacher && entry.teacher.trim() === teacherName) {
+          teacherEntries.push(transformTimetableEntry(entry, entryId++));
+        }
+      });
+    });
+
+    if (teacherEntries.length === 0) {
+      return res.status(404).json({
+        error: 'Resource not found',
+        message: `Teacher '${teacherName}' does not exist`,
+      });
+    }
+
+    res.json({
+      teacherName,
+      entries: teacherEntries
+    });
+  } catch (error: any) {
+    console.error('Error loading teacher timetable:', error);
+    res.status(500).json({
+      error: 'Failed to load teacher timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get field/year timetables - matches frontend API spec
+app.get('/field/:fieldId/year/:year/timetables', async (req: Request, res: Response) => {
+  try {
+    const fieldId = parseInt(req.params.fieldId);
+    const year = parseInt(req.params.year);
+
+    if (isNaN(fieldId) || isNaN(year)) {
+      return res.status(400).json({
+        error: 'Invalid parameters',
+        message: 'Field ID and year must be valid integers',
+      });
+    }
+
+    const fields = await getAllFields();
+
+    // Find field by ID (1-based index)
+    if (fieldId < 1 || fieldId > fields.length) {
+      return res.status(404).json({
+        error: 'Resource not found',
+        message: `Field with ID ${fieldId} does not exist`,
+      });
+    }
+
+    const field = fields[fieldId - 1];
+
+    // Check if year exists for this field
+    if (!field.years.includes(year)) {
+      return res.status(404).json({
+        error: 'Resource not found',
+        message: `Year ${year} is not available for field '${field.name}'`,
+      });
+    }
+
+    // Get the timetable URL for this field and year
+    const timetableUrl = field.yearLinks.get(year);
+    if (!timetableUrl) {
+      return res.status(404).json({
+        error: 'Resource not found',
+        message: `No timetable URL found for field '${field.name}' year ${year}`,
+      });
+    }
+
+    // Parse the timetable
+    const timetable = await parseTimetable(timetableUrl);
+
+    // Group entries by group name
+    const groupsMap = new Map<string, any[]>();
+
+    timetable.entries.forEach((entry, index) => {
+      const groupName = entry.group || 'Unknown';
+      if (!groupsMap.has(groupName)) {
+        groupsMap.set(groupName, []);
+      }
+      groupsMap.get(groupName)!.push(transformTimetableEntry(entry, index + 1));
+    });
+
+    // Convert to array format expected by frontend
+    const timetables = Array.from(groupsMap.entries()).map(([groupName, entries]) => ({
+      field: {
+        id: fieldId,
+        name: field.name,
+        years: field.years
+      },
+      year,
+      groupName,
+      entries
+    }));
+
+    res.json(timetables);
+  } catch (error: any) {
+    console.error('Error loading field/year timetables:', error);
+    res.status(500).json({
+      error: 'Failed to load timetables',
       message: error.message || 'Unknown error occurred',
     });
   }
@@ -960,6 +1189,13 @@ app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.method} ${req.path} not found`,
+    mainEndpoints: [
+      'GET /teachers',
+      'GET /fields',
+      'GET /teacher/:teacherName/timetable',
+      'GET /field/:fieldId/year/:year/timetables',
+      'GET /subjects',
+    ],
     availableEndpoints: [
       'GET /',
       'GET /health',
@@ -970,6 +1206,9 @@ app.use((req: Request, res: Response) => {
       'GET /subjects',
       'GET /subjects/:name',
       'GET /subjects/search?q=term',
+      'GET /teachers',
+      'GET /teacher/:teacherName/timetable',
+      'GET /field/:fieldId/year/:year/timetables',
       'GET /parse?url=<url>',
       'POST /parse-multiple',
       'POST /export',
