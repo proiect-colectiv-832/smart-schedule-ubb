@@ -2,52 +2,287 @@
 
 ## Overview
 
-This test suite provides comprehensive testing for the UBB timetable HTML parser. It validates that the parser correctly extracts all required information from university timetable web pages.
+This test suite provides comprehensive testing for the UBB timetable HTML parser. It validates that the parser correctly extracts timetable information from university web pages that contain **multiple group timetables** identified by H1 headings.
+
+## Key Concepts Tested
+
+### Multi-Group Architecture
+The parser handles pages where:
+- Each `<h1>` heading with a 3-digit number (e.g., "Grupa 211") indicates a group
+- Each group has its own timetable `<table>` following the H1
+- The "Formatia" column contains subgroup info (e.g., "211/1", "211/2") which is preserved
+
+### Two Parsing Methods
+1. **`parseTimetable(url)`** - Combines all groups from a page into one timetable
+2. **`parseTimetablesByGroup(url)`** - Returns separate timetable for each group
+
+---
 
 ## Test Coverage
 
-The test suite covers the following aspects:
+### 1. URL Metadata Extraction
+Tests that verify correct extraction of metadata from URL patterns:
+- ✅ Academic year (e.g., "2024" from "2024-1")
+- ✅ Semester (e.g., "1" from "2024-1")
+- ✅ Specialization (e.g., "INFO" from "INFO3.html")
+- ✅ Year of study (e.g., "3" from "INFO3.html")
+- ✅ Error handling for invalid URL formats
 
-### 1. **Normal Cases - Complete Timetable**
-Tests that verify the parser correctly extracts all fields from a properly formatted timetable:
-- ✅ Days of the week (Luni, Marți, Miercuri, etc.)
-- ✅ Course/subject names
-- ✅ Hours/time intervals (e.g., "08:00-10:00")
-- ✅ Professors/teachers
+**Test Cases:**
+- Standard URL pattern: `/orar/2024-1/tabelar/INFO3.html`
+- Different years and semesters
+- Invalid URL format throws error
+
+---
+
+### 2. Single Group Parsing (`parseTimetable`)
+Tests that verify correct parsing when combining all groups:
+
+#### Complete Timetable Parsing
+- ✅ Days of the week (Luni, Marti, etc.)
+- ✅ Time intervals (e.g., "08:00-10:00")
+- ✅ Frequency (e.g., "sapt. 1-14")
 - ✅ Room numbers
-- ✅ Type/format (Curs, Laborator, Seminar)
-- ✅ Frequency information
-- ✅ Group/formation information
-- ✅ URL metadata extraction (academic year, semester, specialization, year of study)
+- ✅ Formatia/subgroup values (preserved as-is)
+- ✅ Class types (Curs, Laborator, Seminar)
+- ✅ Subject names
+- ✅ Teacher names
 
-### 2. **Edge Cases - Missing Fields**
-Tests that verify the parser handles missing data gracefully:
-- Missing teacher field → defaults to empty string
-- Missing room field → defaults to empty string
-- Missing type/format field → defaults to empty string
-- Missing frequency field → defaults to empty string
-- Missing group field → uses default from URL (specialization + year)
+#### Missing Fields Handling
+- ✅ Missing teacher → defaults to empty string
+- ✅ Missing room → defaults to empty string
+- ✅ Missing frequency → defaults to empty string
+- ✅ Missing optional fields handled gracefully
 
-### 3. **Edge Cases - Malformed HTML**
-Tests that verify the parser can handle various HTML issues:
-- Extra whitespace in cells → properly trimmed
-- Non-breaking spaces (`&nbsp;`) → converted to regular spaces
-- Multiple comma-separated teachers → normalized with proper spacing
-- Empty rows → skipped
-- Rows with no `<td>` elements → skipped
+#### Data Normalization
+- ✅ Whitespace normalization in teacher names
+- ✅ Empty rows are skipped
+- ✅ Non-breaking spaces removed
 
-### 4. **Edge Cases - Empty Timetable**
-Tests for scenarios with minimal or no data:
-- Table with only headers → returns empty entries array
-- No table found → throws appropriate error
-- Table with too few columns → throws error
+---
 
-### 5. **Edge Cases - Different Header Variations**
-Tests that verify the parser recognizes various Romanian header names:
-- "Zi", "Ziua" → recognized as day
-- "Ora", "Ore", "Interval orar" → recognized as hours
-- "Materie", "Disciplina", "Curs" → recognized as subject
-- "Sala", "Locație", "Sala/Lab" → recognized as room
+### 3. Multiple Groups Parsing (`parseTimetablesByGroup`)
+Tests that verify correct identification and separation of groups:
+
+#### Group Identification
+- ✅ Detects groups from H1 headings with 3-digit numbers
+- ✅ Extracts full H1 text as group name (e.g., "Grupa 211")
+- ✅ Skips H1 elements without 3-digit numbers
+- ✅ Handles multiple groups on same page (211, 212, 213)
+
+**Example:**
+```html
+<h1>Grupa 211</h1>
+<table>...</table>
+<h1>Grupa 212</h1>
+<table>...</table>
+```
+Result: 2 separate timetables
+
+#### Per-Group Entry Extraction
+- ✅ Correct entries assigned to each group
+- ✅ Subgroup information preserved in Formatia column
+- ✅ Each group has its own entry list
+
+**Example:**
+- Group "Grupa 831" has entries with Formatia: "831/1", "831/2"
+- Group "Grupa 832" has entries with Formatia: "832/1"
+
+#### Edge Cases
+- ✅ Groups without following table are skipped
+- ✅ H1 without 3-digit number is ignored
+- ✅ Throws error when no valid groups found
+
+---
+
+### 4. Subgroup Preservation
+Tests that verify Formatia column values are kept as-is:
+
+- ✅ "211/1", "211/2" preserved exactly
+- ✅ "I1", "I2" preserved exactly
+- ✅ Other formats preserved exactly
+- ✅ Formatia is NOT used as the group identifier (H1 is)
+
+**Important:** 
+- Group name comes from H1 (e.g., "Grupa 211")
+- Formatia column contains subgroups (e.g., "211/1", "211/2")
+
+---
+
+### 5. Combined vs Separated Parsing
+Tests comparing both parsing methods:
+
+- ✅ Total entries match between methods
+- ✅ `parseTimetable()` combines all groups
+- ✅ `parseTimetablesByGroup()` separates by group
+- ✅ Sum of separated entries = combined entries
+
+---
+
+### 6. Multiple Timetables (`parseMultipleTimetables`)
+Tests for batch parsing multiple URLs:
+
+- ✅ Successfully parses multiple URLs
+- ✅ Handles partial failures gracefully
+- ✅ Returns only successful parses
+- ✅ Continues parsing even if one URL fails
+
+**Example:**
+```typescript
+const urls = [
+  'https://example.com/.../CS1.html',
+  'https://example.com/.../CS2.html',  // fails
+  'https://example.com/.../CS3.html'
+];
+// Returns timetables for CS1 and CS3
+```
+
+---
+
+### 7. Utility Functions
+Tests for helper functions:
+
+#### `exportToJson(timetable, pretty)`
+- ✅ Formats timetable as JSON string
+- ✅ Respects pretty parameter
+- ✅ Produces valid parseable JSON
+- ✅ Pretty version has newlines, compact doesn't
+
+#### `createTimetableHash(timetable)`
+- ✅ Generates SHA-256 hash
+- ✅ Consistent hashes for same timetable
+- ✅ Different hashes for different timetables
+- ✅ Returns 64-character hex string
+
+---
+
+### 8. Error Handling
+Tests for various error scenarios:
+
+- ✅ Empty page (< 1000 bytes) → throws specific error
+- ✅ Page with no timetable tables → throws error
+- ✅ Network errors propagate correctly
+- ✅ Invalid URL format → throws descriptive error
+
+**Error Messages:**
+- "Empty timetable page (X bytes) - program may not have started yet"
+- "Could not locate any timetable tables on the page"
+- "Could not locate any group timetables on the page"
+- "URL does not match expected pattern"
+
+---
+
+## Running the Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run only timetable parser tests
+npm test timetable-parser.test.ts
+
+# Run with coverage
+npm run test:coverage
+
+# Run in watch mode
+npm run test:watch
+```
+
+---
+
+## Test Structure
+
+### Helper Functions
+The test file includes helper functions for generating test HTML:
+
+```typescript
+createSingleGroupHtml(groupNumber: string)
+// Creates HTML with one group
+
+createMultipleGroupsHtml(groupNumbers: string[])
+// Creates HTML with multiple groups
+```
+
+### Test Organization
+Tests are organized into logical describe blocks:
+1. URL Metadata Extraction
+2. Single Group Parsing
+3. Multiple Groups Parsing  
+4. Subgroup Preservation
+5. Combined vs Separated
+6. Multiple Timetables
+7. Utility Functions
+8. Error Handling
+
+---
+
+## Coverage Goals
+
+- **Statements**: > 95%
+- **Branches**: > 90%
+- **Functions**: 100%
+- **Lines**: > 95%
+
+---
+
+## Example Test Cases
+
+### Testing Multiple Groups
+```typescript
+test('should parse multiple groups from H1 headings', async () => {
+  const html = `
+    <h1>Grupa 211</h1>
+    <table>...</table>
+    <h1>Grupa 212</h1>
+    <table>...</table>
+  `;
+  
+  const result = await parseTimetablesByGroup(url);
+  
+  expect(result).toHaveLength(2);
+  expect(result[0].groupName).toBe('Grupa 211');
+  expect(result[1].groupName).toBe('Grupa 212');
+});
+```
+
+### Testing Subgroup Preservation
+```typescript
+test('should preserve subgroup information', async () => {
+  const html = `
+    <h1>Grupa 221</h1>
+    <table>
+      <tr><th>Formatia</th></tr>
+      <tr><td>221/1</td></tr>
+      <tr><td>221/2</td></tr>
+    </table>
+  `;
+  
+  const result = await parseTimetablesByGroup(url);
+  
+  expect(result[0].entries[0].group).toBe('221/1');
+  expect(result[0].entries[1].group).toBe('221/2');
+});
+```
+
+---
+
+## Notes for Developers
+
+1. **Mock Data**: All tests use mocked axios to avoid real HTTP requests
+2. **Test Isolation**: Each test is independent and cleans up after itself
+3. **Realistic HTML**: Test HTML closely mirrors actual UBB timetable pages
+4. **Edge Cases**: Pay special attention to H1 detection and Formatia preservation
+
+---
+
+## Continuous Integration
+
+These tests run automatically on:
+- Every commit
+- Every pull request
+- Before deployment
+
+Failing tests block merges to main branch.
 
 ### 6. **URL Validation**
 Tests for URL parsing and metadata extraction:
