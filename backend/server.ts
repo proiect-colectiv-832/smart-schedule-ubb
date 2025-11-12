@@ -117,7 +117,7 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
     frequency,
     type,
     room: entry.room || '',
-    format: 'In-person'
+    format: entry.group || ''  // MIE3, 832, 831/1, etc. - valoarea din coloana Formatia
   };
 }
 

@@ -65,7 +65,7 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
     frequency,
     type,
     room: entry.room || '',
-    format: 'In-person'
+    format: entry.group || ''  // MIE3, 832, 831/1, etc. - valoarea din coloana Formatia
   };
 }
 
@@ -113,11 +113,12 @@ testEntries.forEach((entry, index) => {
   console.log(`  Subject: ${transformed.subjectName}`);
   console.log(`  Type: ${transformed.type}`);
   console.log(`  Day: ${transformed.day}`);
+  console.log(`  Format (Formatia): ${transformed.format}`);
   console.log();
 });
 
 console.log('✅ Expected results:');
-console.log('  Entry 1: "sapt. 1" → "oddweeks"');
-console.log('  Entry 2: "sapt. 2" → "evenweeks"');
-console.log('  Entry 3: "sapt. 1-14" → "weekly"');
+console.log('  Entry 1: "sapt. 1" → "oddweeks", format: "MIE3"');
+console.log('  Entry 2: "sapt. 2" → "evenweeks", format: "MIE3"');
+console.log('  Entry 3: "sapt. 1-14" → "weekly", format: "MIE3"');
 
