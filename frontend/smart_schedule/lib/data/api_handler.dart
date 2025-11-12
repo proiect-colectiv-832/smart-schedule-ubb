@@ -6,7 +6,8 @@ import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/models/timetables.dart';
 
 class ApiHandler {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl =
+      'https://smart-schedule-ubb-production.up.railway.app';
   const ApiHandler();
 
   // Helper method to parse day string to Day enum
