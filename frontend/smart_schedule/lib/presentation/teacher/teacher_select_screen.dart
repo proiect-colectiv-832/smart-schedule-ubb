@@ -118,8 +118,8 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                         }
 
                         final double width = constraints.maxWidth;
-                        int crossAxisCount = (width / 150).floor();
-                        if (crossAxisCount < 3) crossAxisCount = 3;
+                        int crossAxisCount = (width / 200).floor();
+                        if (crossAxisCount < 2) crossAxisCount = 2;
 
                         return GridView.builder(
                           padding: const EdgeInsets.symmetric(
