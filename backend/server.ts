@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import http from 'http';
+import * as http from 'http';
 import {
   parseTimetable,
   parseTimetablesByGroup,
