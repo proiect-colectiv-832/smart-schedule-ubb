@@ -112,18 +112,56 @@ describe('Timetable Parser Tests', () => {
       expect(result[1].entries[0].group).toBe('832/1');
     });
 
-    test('should skip H1 elements without 3-digit group numbers', async () => {
-      const html = createHtmlWithInvalidH1();
-      mockedAxios.get.mockResolvedValue({ data: html });
+    test('should handle groups with various digit counts', async () => {
+      const padding = '<!-- Padding to make page larger than 1000 bytes -->'.repeat(20);
+      const html = `<html><body>
+        ${padding}
+        <h1>Title Page</h1>
+        <table><tr><th>Ziua</th><th>Ore</th><th>Disciplina</th><th>Frecventa</th><th>Sala</th></tr></table>
+        <h1>Grupa 11</h1>
+        <table>
+          <tr><th>Ziua</th><th>Ore</th><th>Disciplina</th><th>Frecventa</th><th>Sala</th></tr>
+          <tr><td>Luni</td><td>08:00-10:00</td><td>Subject A</td><td>sapt. 1-14</td><td>Room 101</td></tr>
+        </table>
+        <h1>Grupa 311</h1>
+        <table>
+          <tr><th>Ziua</th><th>Ore</th><th>Disciplina</th><th>Frecventa</th><th>Sala</th></tr>
+          <tr><td>Marti</td><td>10:00-12:00</td><td>Subject B</td><td>sapt. 1-14</td><td>Room 202</td></tr>
+        </table>
+        <h1>Grupa 1234</h1>
+        <table>
+          <tr><th>Ziua</th><th>Ore</th><th>Disciplina</th><th>Frecventa</th><th>Sala</th></tr>
+          <tr><td>Miercuri</td><td>12:00-14:00</td><td>Subject C</td><td>sapt. 1-14</td><td>Room 303</td></tr>
+        </table>
+        <h1>Invalid Group</h1>
+        <table><tr><th>Ziua</th><th>Ore</th><th>Disciplina</th></tr></table>
+      </body></html>`;
 
+      mockedAxios.get.mockResolvedValue({ data: html });
       const result = await parseTimetablesByGroup(validUrl);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].groupName).toBe('Grupa 311');
+      expect(result).toHaveLength(3);
+      expect(result[0].groupName).toBe('Grupa 11');
+      expect(result[1].groupName).toBe('Grupa 311');
+      expect(result[2].groupName).toBe('Grupa 1234');
     });
 
     test('should throw error when no groups found', async () => {
-      const html = createHtmlWithNoGroups();
+      const padding = '<!-- Padding to make page larger than 1000 bytes -->'.repeat(20);
+      const html = `<html><body>
+        ${padding}
+        <h1>No Groups Here</h1>
+        <table>
+          <tr><th>Ziua</th><th>Ore</th><th>Disciplina</th><th>Frecventa</th><th>Sala</th></tr>
+          <tr><td>Luni</td><td>08:00-10:00</td><td>Test</td><td>sapt. 1-14</td><td>Room</td></tr>
+        </table>
+        <h1>Another Invalid H1</h1>
+        <table>
+          <tr><th>Ziua</th><th>Ore</th><th>Disciplina</th><th>Frecventa</th><th>Sala</th></tr>
+          <tr><td>Marti</td><td>10:00-12:00</td><td>Test2</td><td>sapt. 1-14</td><td>Room2</td></tr>
+        </table>
+      </body></html>`;
+
       mockedAxios.get.mockResolvedValue({ data: html });
 
       await expect(parseTimetablesByGroup(validUrl))
@@ -234,12 +272,13 @@ describe('Timetable Parser Tests', () => {
       mockedAxios.get.mockResolvedValue({ data: emptyHtml });
 
       await expect(parseTimetable(validUrl))
-        .rejects.toThrow('Empty timetable page');
+        .rejects.toThrow(/Empty timetable page.*bytes.*program may not have started yet/);
     });
 
     test('should throw error for page with no timetable tables', async () => {
-      const html = '<html><body><h1>Grupa 111</h1><p>No table here</p></body></html>';
-      mockedAxios.get.mockResolvedValue({ data: html });
+      // Create a page larger than 1000 bytes with no valid tables
+      const largeHtml = '<html><body><h1>Grupa 111</h1>' + '<p>No table here</p>'.repeat(100) + '</body></html>';
+      mockedAxios.get.mockResolvedValue({ data: largeHtml });
 
       await expect(parseTimetable(validUrl))
         .rejects.toThrow('Could not locate any timetable tables');

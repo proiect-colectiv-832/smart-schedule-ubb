@@ -41,14 +41,14 @@ expect(result.entries[0].subject).toBe('Algoritmi Paraleli');
 Tests parsing of timetable pages into separate timetables for each group based on H1 headings.
 
 **Key Concept:**  
-- Each `<h1>` with a 3-digit number (e.g., "Grupa 211") identifies a group
+- Each `<h1>` with a number of 2+ digits (e.g., "Grupa 211", "Grupa 1234") identifies a group
 - Each group has its own timetable table following the H1
 - Formatia column (e.g., "211/1", "211/2") contains subgroup info
 
 **Test Cases:**
 - ✅ **Parse multiple groups from H1 headings** - Identifies "Grupa 211", "Grupa 212", etc.
 - ✅ **Extract correct entries for each group** - Each group has its own entry list
-- ✅ **Skip H1 elements without 3-digit numbers** - Ignores invalid H1 elements
+- ✅ **Handle groups with various digit counts** - Supports 2-digit (11), 3-digit (311), and 4+ digit (1234) groups
 - ✅ **Throw error when no groups found** - Error if no valid groups on page
 
 **Example:**
@@ -56,7 +56,7 @@ Tests parsing of timetable pages into separate timetables for each group based o
 const result = await parseTimetablesByGroup(url);
 // Returns array of timetables, one per group
 expect(result[0].groupName).toBe('Grupa 211');
-expect(result[1].groupName).toBe('Grupa 212');
+expect(result[1].groupName).toBe('Grupa 1234'); // 4-digit groups also work!
 ```
 
 ---
@@ -167,7 +167,8 @@ Creates HTML with no valid groups.
 ## Key Parser Behaviors Tested
 
 ### 1. Group Identification
-✅ Groups are identified by `<h1>` elements containing 3-digit numbers  
+✅ Groups are identified by `<h1>` elements containing numbers with 2+ digits  
+✅ Supports 2-digit (e.g., "Grupa 11"), 3-digit (e.g., "Grupa 211"), and 4+ digit groups (e.g., "Grupa 1234")  
 ✅ Group name is the full H1 text (e.g., "Grupa 211")  
 ✅ Each group has its own table following the H1
 

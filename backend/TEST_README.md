@@ -61,14 +61,14 @@ Tests that verify correct parsing when combining all groups:
 
 ---
 
-### 3. Multiple Groups Parsing (`parseTimetablesByGroup`)
+### 3. Multiple Groups Parsing (`parseTimetablesByGroup()`)
 Tests that verify correct identification and separation of groups:
 
 #### Group Identification
-- ✅ Detects groups from H1 headings with 3-digit numbers
-- ✅ Extracts full H1 text as group name (e.g., "Grupa 211")
-- ✅ Skips H1 elements without 3-digit numbers
-- ✅ Handles multiple groups on same page (211, 212, 213)
+- ✅ Detects groups from H1 headings with 2+ digit numbers
+- ✅ Extracts full H1 text as group name (e.g., "Grupa 211", "Grupa 1234")
+- ✅ Skips H1 elements without valid group numbers (single digit or no digits)
+- ✅ Handles multiple groups on same page (211, 212, 213, or even 1234)
 
 **Example:**
 ```html

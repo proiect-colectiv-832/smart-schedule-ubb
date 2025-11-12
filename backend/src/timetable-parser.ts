@@ -262,11 +262,11 @@ export async function parseTimetablesByGroup(url: string): Promise<Array<Timetab
     $('h1').each((_, h1) => {
         const h1Text = $(h1).text().trim();
 
-        // Check if this h1 contains a group identifier (3-digit number)
-        const groupMatch = h1Text.match(/\b(\d{3})\b/);
-        if (!groupMatch) return; // Skip h1s that don't contain a 3-digit group number
+        // Check if this h1 contains a group identifier (any number with 2+ digits)
+        const groupMatch = h1Text.match(/\b(\d{2,})\b/);
+        if (!groupMatch) return; // Skip h1s that don't contain a group number
 
-        // Use the full h1 text as the group name (e.g., "Grupa 211")
+        // Use the full h1 text as the group name (e.g., "Grupa 211", "Grupa 1234")
         const groupName = h1Text;
 
         // Find the next table after this h1
