@@ -183,7 +183,17 @@ async function cacheSubjects(fields: Field[]): Promise<Optional_subject[]> {
         } catch (error) {
           failed++;
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error(`   ❌ Failed: ${errorMessage.substring(0, 60)}`);
+          
+          // Categorize errors for better reporting
+          if (errorMessage.includes('Empty timetable page') || errorMessage.includes('No HTML tables found')) {
+            console.error(`   📋 Empty: ${url.split('/').pop()}`);
+          } else if (errorMessage.includes('Could not locate timetable table')) {
+            console.error(`   📋 No data: ${url.split('/').pop()}`);
+          } else if (errorMessage.includes('URL does not match')) {
+            console.error(`   ❌ URL pattern: ${url.split('/').pop()}`);
+          } else {
+            console.error(`   ❌ Failed: ${errorMessage.substring(0, 60)}`);
+          }
         }
       })
     );

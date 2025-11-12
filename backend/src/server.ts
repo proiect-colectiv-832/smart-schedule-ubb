@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import http from 'http';
 import {
   parseTimetable,
   parseMultipleTimetables,
@@ -16,9 +17,26 @@ import {
   searchSubjects,
   getCacheStats
 } from './cache-manager';
+import {
+  createNotification,
+  getNotifications,
+  getNotificationById,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  getNotificationStats,
+  createScheduleChangeNotification,
+  cleanupExpiredNotifications
+} from './notification-manager';
+import { NotificationType, NotificationPriority } from './notification-types';
+import { PushNotificationManager } from './push-notification-manager';
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize push notification manager
+let pushManager: PushNotificationManager;
 
 // Middleware
 app.use(cors());
@@ -44,6 +62,20 @@ app.get('/', (req: Request, res: Response) => {
       'GET /parse': 'Parse a single timetable (requires ?url=<timetable_url>)',
       'POST /parse-multiple': 'Parse multiple timetables (requires JSON body with urls array)',
       'GET /example-urls': 'Get example timetable URLs',
+      'GET /notifications': 'Get notifications (supports query params: userId, type, read, priority, limit, offset)',
+      'POST /notifications': 'Create a new notification',
+      'GET /notifications/:id': 'Get specific notification by ID',
+      'PUT /notifications/:id/read': 'Mark notification as read',
+      'PUT /notifications/read-all': 'Mark all notifications as read for a user (requires userId in body)',
+      'DELETE /notifications/:id': 'Delete a notification',
+      'GET /notifications/stats': 'Get notification statistics (supports ?userId=)',
+      'POST /notifications/schedule-change': 'Create schedule change notification',
+      'GET /push/vapid-public-key': 'Get VAPID public key for web push subscriptions',
+      'POST /push/subscribe': 'Subscribe to push notifications',
+      'POST /push/unsubscribe': 'Unsubscribe from push notifications',
+      'GET /push/stats': 'Get push notification statistics',
+      'POST /push/send': 'Send push notification to specific users',
+      'POST /push/broadcast': 'Broadcast notification to all connected users',
     },
     usage: {
       fields: 'GET /fields',
@@ -391,6 +423,509 @@ app.get('/example-urls', (req: Request, res: Response) => {
   });
 });
 
+// ============== NOTIFICATION ENDPOINTS ==============
+
+// Get notifications with filtering and pagination
+app.get('/notifications', async (req: Request, res: Response) => {
+  try {
+    const {
+      userId,
+      type,
+      read,
+      priority,
+      limit,
+      offset,
+      since
+    } = req.query;
+
+    const query = {
+      userId: userId as string,
+      type: type as any,
+      read: read !== undefined ? read === 'true' : undefined,
+      priority: priority as any,
+      limit: limit ? parseInt(limit as string) : undefined,
+      offset: offset ? parseInt(offset as string) : undefined,
+      since: since as string
+    };
+
+    const result = await getNotifications(query);
+
+    res.json({
+      success: true,
+      data: result.notifications,
+      pagination: {
+        total: result.total,
+        limit: query.limit || 50,
+        offset: query.offset || 0,
+        hasMore: result.hasMore
+      }
+    });
+  } catch (error: any) {
+    console.error('Error getting notifications:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get notifications',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Create a new notification
+app.post('/notifications', async (req: Request, res: Response) => {
+  try {
+    const {
+      userId,
+      type,
+      title,
+      message,
+      data,
+      priority,
+      expiresAt,
+      actionUrl,
+      actionText
+    } = req.body;
+
+    if (!userId || !type || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId, type, title, and message are required',
+      });
+    }
+
+    const notification = await createNotification({
+      userId,
+      type,
+      title,
+      message,
+      data,
+      priority,
+      expiresAt,
+      actionUrl,
+      actionText
+    });
+
+    res.status(201).json({
+      success: true,
+      data: notification,
+    });
+  } catch (error: any) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create notification',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get notification statistics
+app.get('/notifications/stats', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+    const stats = await getNotificationStats(userId as string);
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error: any) {
+    console.error('Error getting notification stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get notification stats',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get specific notification by ID
+app.get('/notifications/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const notification = await getNotificationById(id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        error: 'Notification not found',
+        message: `No notification found with ID: ${id}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: notification,
+    });
+  } catch (error: any) {
+    console.error('Error getting notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get notification',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Mark notification as read
+app.put('/notifications/:id/read', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const success = await markAsRead(id);
+
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: 'Notification not found',
+        message: `No notification found with ID: ${id}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read',
+    });
+  } catch (error: any) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to mark notification as read',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Mark all notifications as read for a user
+app.put('/notifications/read-all', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const count = await markAllAsRead(userId);
+
+    res.json({
+      success: true,
+      message: `Marked ${count} notifications as read`,
+      data: { markedCount: count },
+    });
+  } catch (error: any) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to mark notifications as read',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete a notification
+app.delete('/notifications/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const success = await deleteNotification(id);
+
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: 'Notification not found',
+        message: `No notification found with ID: ${id}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Notification deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete notification',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Create schedule change notification (convenience endpoint)
+app.post('/notifications/schedule-change', async (req: Request, res: Response) => {
+  try {
+    const {
+      userId,
+      changeType,
+      subject,
+      oldValue,
+      newValue,
+      date
+    } = req.body;
+
+    if (!userId || !changeType || !subject || !oldValue || !newValue || !date) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId, changeType, subject, oldValue, newValue, and date are required',
+      });
+    }
+
+    if (!['room', 'time', 'teacher', 'cancelled'].includes(changeType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid changeType',
+        message: 'changeType must be one of: room, time, teacher, cancelled',
+      });
+    }
+
+    const notification = await createScheduleChangeNotification(
+      userId,
+      changeType,
+      subject,
+      oldValue,
+      newValue,
+      date
+    );
+
+    res.status(201).json({
+      success: true,
+      data: notification,
+    });
+  } catch (error: any) {
+    console.error('Error creating schedule change notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create schedule change notification',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// === PUSH NOTIFICATION ENDPOINTS ===
+
+// Get VAPID public key for web push subscriptions
+app.get('/push/vapid-public-key', async (req: Request, res: Response) => {
+  try {
+    const publicKey = await pushManager.getVapidPublicKey();
+    if (!publicKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'VAPID keys not configured',
+        message: 'Web push notifications are not properly configured'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { publicKey }
+    });
+  } catch (error: any) {
+    console.error('Error getting VAPID public key:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get VAPID public key',
+      message: error.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// Subscribe to push notifications
+app.post('/push/subscribe', async (req: Request, res: Response) => {
+  try {
+    const { userId, subscription } = req.body;
+
+    if (!userId || !subscription) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and subscription are required'
+      });
+    }
+
+    if (!subscription.endpoint || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid subscription format',
+        message: 'Subscription must include endpoint and keys (p256dh, auth)'
+      });
+    }
+
+    await pushManager.registerPushSubscription(userId, subscription);
+
+    res.status(201).json({
+      success: true,
+      message: 'Push subscription registered successfully'
+    });
+  } catch (error: any) {
+    console.error('Error registering push subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to register push subscription',
+      message: error.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// Unsubscribe from push notifications
+app.post('/push/unsubscribe', async (req: Request, res: Response) => {
+  try {
+    const { userId, subscriptionId } = req.body;
+
+    if (!userId || !subscriptionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and subscriptionId are required'
+      });
+    }
+
+    const removed = await pushManager.removePushSubscription(userId, subscriptionId);
+
+    if (!removed) {
+      return res.status(404).json({
+        success: false,
+        error: 'Subscription not found',
+        message: 'No subscription found with the provided ID for this user'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Push subscription removed successfully'
+    });
+  } catch (error: any) {
+    console.error('Error removing push subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to remove push subscription',
+      message: error.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// Get push notification statistics
+app.get('/push/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = pushManager.getStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    console.error('Error getting push stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get push statistics',
+      message: error.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// Send push notification to specific users
+app.post('/push/send', async (req: Request, res: Response) => {
+  try {
+    const { userIds, notification, pushPayload } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing or invalid userIds',
+        message: 'userIds must be a non-empty array'
+      });
+    }
+
+    if (!notification || !notification.title || !notification.message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid notification',
+        message: 'Notification must include title and message'
+      });
+    }
+
+    // Create notification in database first
+    const savedNotification = await createNotification({
+      userId: userIds[0], // Use first user as primary recipient
+      type: notification.type || 'system',
+      title: notification.title,
+      message: notification.message,
+      data: notification.data || {},
+      priority: notification.priority || 'normal',
+      actionUrl: notification.actionUrl,
+      actionText: notification.actionText
+    });
+
+    // Send push notifications to all specified users
+    const promises = userIds.map(userId => 
+      pushManager.sendPushNotification(userId, savedNotification, pushPayload)
+    );
+
+    await Promise.all(promises);
+
+    res.status(201).json({
+      success: true,
+      message: `Push notification sent to ${userIds.length} users`,
+      data: { notificationId: savedNotification.id, recipients: userIds.length }
+    });
+  } catch (error: any) {
+    console.error('Error sending push notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send push notification',
+      message: error.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// Broadcast notification to all connected users
+app.post('/push/broadcast', async (req: Request, res: Response) => {
+  try {
+    const { notification, pushPayload, targetUsers } = req.body;
+
+    if (!notification || !notification.title || !notification.message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid notification',
+        message: 'Notification must include title and message'
+      });
+    }
+
+    // Create notification in database
+    const savedNotification = await createNotification({
+      userId: 'system', // System broadcast
+      type: notification.type || 'announcement',
+      title: notification.title,
+      message: notification.message,
+      data: notification.data || {},
+      priority: notification.priority || 'normal',
+      actionUrl: notification.actionUrl,
+      actionText: notification.actionText
+    });
+
+    // Broadcast to all or specified users
+    await pushManager.broadcastNotification(savedNotification, targetUsers);
+
+    const recipients = targetUsers ? targetUsers.length : pushManager.getConnectedUsers().length;
+
+    res.status(201).json({
+      success: true,
+      message: `Notification broadcasted to ${recipients} users`,
+      data: { notificationId: savedNotification.id, recipients }
+    });
+  } catch (error: any) {
+    console.error('Error broadcasting notification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to broadcast notification',
+      message: error.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// === END PUSH NOTIFICATION ENDPOINTS ===
+
 // Create hash for a timetable
 app.post('/hash', async (req: Request, res: Response) => {
   try {
@@ -440,6 +975,14 @@ app.use((req: Request, res: Response) => {
       'POST /export',
       'GET /example-urls',
       'POST /hash',
+      'GET /notifications',
+      'POST /notifications',
+      'GET /notifications/:id',
+      'PUT /notifications/:id/read',
+      'PUT /notifications/read-all',
+      'DELETE /notifications/:id',
+      'GET /notifications/stats',
+      'POST /notifications/schedule-change',
     ],
   });
 });
@@ -470,7 +1013,11 @@ async function startServer() {
     console.error('   Error:', error instanceof Error ? error.message : error);
   }
 
-  app.listen(PORT, () => {
+  // Initialize push notification manager
+  pushManager = new PushNotificationManager(server);
+  console.log('📱 Push notification manager initialized');
+
+  server.listen(PORT, () => {
     console.log('='.repeat(60));
     console.log(`🚀 Server running at http://localhost:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/`);
@@ -478,7 +1025,19 @@ async function startServer() {
     console.log(`📊 Cache Stats: http://localhost:${PORT}/cache/stats`);
     console.log(`📖 All Fields: http://localhost:${PORT}/fields`);
     console.log(`📚 All Subjects: http://localhost:${PORT}/subjects`);
+    console.log(`📢 Notifications: http://localhost:${PORT}/notifications`);
+    console.log(`📱 Push Notifications: WebSocket + Web Push enabled`);
+    console.log(`🔑 VAPID Public Key: http://localhost:${PORT}/push/vapid-public-key`);
     console.log('='.repeat(60));
+    
+    // Set up periodic cleanup of expired notifications (every hour)
+    setInterval(async () => {
+      try {
+        await cleanupExpiredNotifications();
+      } catch (error) {
+        console.error('Error during notification cleanup:', error);
+      }
+    }, 60 * 60 * 1000); // 1 hour
   });
 }
 

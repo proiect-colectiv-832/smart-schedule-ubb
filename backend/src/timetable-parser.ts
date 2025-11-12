@@ -100,16 +100,30 @@ function buildColumnMapping(headers: string[]): { [colIndex: number]: keyof Time
   return mapping;
 }
 
-const URL_REGEX = /\/files\/orar\/(\d{4})-(\d)\/tabelar\/([A-Za-z]+)(\d+)\.html$/i;
+const URL_REGEX = /\/files\/orar\/(\d{4})-(\d)\/tabelar\/([A-Za-z0-9]+)\.html$/i;
 
 function extractUrlMetadata(url: string) {
   const m = url.match(URL_REGEX);
   if (!m) {
     throw new Error(
-      'URL does not match expected pattern {YEAR}-{SEMESTER}/tabelar/{SPECIALIZATION}{YEAR}.html'
+      'URL does not match expected pattern {YEAR}-{SEMESTER}/tabelar/{SPECIALIZATION}.html'
     );
   }
-  const [, academicYear, semester, specialization, yearOfStudy] = m;
+  const [, academicYear, semester, filename] = m;
+  
+  // Extract specialization and year from filename
+  // Handle patterns like: MIE3, CTI1, MaAI4CI1, etc.
+  const filenameMatch = filename.match(/^([A-Za-z]+)(\d+)$/);
+  let specialization, yearOfStudy;
+  
+  if (filenameMatch) {
+    [, specialization, yearOfStudy] = filenameMatch;
+  } else {
+    // Fallback for complex names like MaAI4CI1
+    specialization = filename.replace(/\d+$/, '');
+    yearOfStudy = filename.match(/\d+$/)?.[0] || '1';
+  }
+  
   return { academicYear, semester, specialization, yearOfStudy };
 }
 
@@ -133,6 +147,11 @@ export async function parseTimetable(url: string): Promise<Timetable> {
 
   const candidate = findTimetableTable($);
   if (!candidate || candidate.score < 3) {
+    // Check if page exists but is empty (common for programs not yet started)
+    const pageSize = response.data.length;
+    if (pageSize < 1000) {
+      throw new Error(`Empty timetable page (${pageSize} bytes) - program may not have started yet`);
+    }
     throw new Error(
       'Could not locate timetable table. Headers detected: ' + (candidate?.headers.join(', ') || 'none')
     );
