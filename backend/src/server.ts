@@ -3,6 +3,7 @@ import cors from 'cors';
 import http from 'http';
 import {
   parseTimetable,
+  parseTimetablesByGroup,
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash,
@@ -483,31 +484,26 @@ app.get('/field/:fieldId/year/:year/timetables', async (req: Request, res: Respo
       });
     }
 
-    // Parse the timetable
-    const timetable = await parseTimetable(timetableUrl);
+    // Parse the timetable - this returns separate timetables for each group
+    const groupTimetables = await parseTimetablesByGroup(timetableUrl);
 
-    // Group entries by group name
-    const groupsMap = new Map<string, any[]>();
+    // Transform each group timetable to frontend format
+    const timetables = groupTimetables.map((groupTimetable, groupIndex) => {
+      const entries = groupTimetable.entries.map((entry, entryIndex) =>
+        transformTimetableEntry(entry, (groupIndex + 1) * 1000 + entryIndex)
+      );
 
-    timetable.entries.forEach((entry, index) => {
-      const groupName = entry.group || 'Unknown';
-      if (!groupsMap.has(groupName)) {
-        groupsMap.set(groupName, []);
-      }
-      groupsMap.get(groupName)!.push(transformTimetableEntry(entry, index + 1));
+      return {
+        field: {
+          id: fieldId,
+          name: field.name,
+          years: field.years
+        },
+        year,
+        groupName: groupTimetable.groupName,
+        entries
+      };
     });
-
-    // Convert to array format expected by frontend
-    const timetables = Array.from(groupsMap.entries()).map(([groupName, entries]) => ({
-      field: {
-        id: fieldId,
-        name: field.name,
-        years: field.years
-      },
-      year,
-      groupName,
-      entries
-    }));
 
     res.json(timetables);
   } catch (error: any) {
