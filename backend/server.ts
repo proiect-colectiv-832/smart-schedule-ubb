@@ -78,18 +78,17 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
     'sunday': 'sunday'
   };
 
-  // Normalize frequency
-  const frequencyMap: Record<string, string> = {
-    'sapt': 'weekly',
-    'săpt': 'weekly',
-    'weekly': 'weekly',
-    's1': 'oddweeks',
-    's2': 'evenweeks',
-    'odd': 'oddweeks',
-    'even': 'evenweeks',
-    'oddweeks': 'oddweeks',
-    'evenweeks': 'evenweeks'
-  };
+  // Normalize frequency - check for specific patterns first
+  let frequency = 'weekly'; // default
+  const freqLower = (entry.frequency || '').toLowerCase().trim();
+
+  if (freqLower.includes('sapt. 1') || freqLower.includes('săpt. 1') || freqLower === 's1') {
+    frequency = 'oddweeks'; // săptămână impară
+  } else if (freqLower.includes('sapt. 2') || freqLower.includes('săpt. 2') || freqLower === 's2') {
+    frequency = 'evenweeks'; // săptămână pară
+  } else if (freqLower.includes('1-14') || freqLower.includes('săpt') || freqLower.includes('sapt')) {
+    frequency = 'weekly'; // toate săptămânile
+  }
 
   // Normalize type
   const typeMap: Record<string, string> = {
@@ -104,7 +103,6 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
   };
 
   const day = dayMap[entry.day?.toLowerCase()] || 'monday';
-  const frequency = frequencyMap[entry.frequency?.toLowerCase()] || 'weekly';
   const type = typeMap[entry.type?.toLowerCase()] || 'lecture';
 
   return {
@@ -369,6 +367,31 @@ app.get('/subjects/search', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to search subjects',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get all subjects - matches frontend API spec
+app.get('/subjects', async (req: Request, res: Response) => {
+  try {
+    const subjects = await getAllSubjects();
+
+    // Transform to frontend format with entries
+    let globalEntryId = 1;
+    const subjectsData = subjects.map((subject, index) => ({
+      id: index + 1,
+      name: subject.name,
+      entries: subject.timetableEntries.map(entry =>
+        transformTimetableEntry(entry, globalEntryId++)
+      )
+    }));
+
+    res.json(subjectsData);
+  } catch (error: any) {
+    console.error('Error loading subjects:', error);
+    res.status(500).json({
+      error: 'Failed to load subjects',
       message: error.message || 'Unknown error occurred',
     });
   }

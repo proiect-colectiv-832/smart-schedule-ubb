@@ -7,7 +7,7 @@ import {
   groupByLevel,
   findSpecialization,
   Specialization,
-} from './specialization-parser';
+} from '../src/specialization-parser';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;

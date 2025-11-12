@@ -5,8 +5,8 @@ import {
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash
-} from './timetable-parser';
-import { Timetable } from './types';
+} from '../src/timetable-parser';
+import { Timetable } from '../src/types';
 
 // Mock axios
 jest.mock('axios');
@@ -79,6 +79,47 @@ describe('Timetable Parser Tests', () => {
 
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0].subject).toBe('Fizica');
+    });
+
+    test('should correctly extract odd/even week frequencies', async () => {
+      const html = `<html><body>
+        <h1>Grupa 311</h1>
+        <table>
+          <tr>
+            <th>Ziua</th><th>Ore</th><th>Frecventa</th><th>Sala</th>
+            <th>Formatia</th><th>Tip</th><th>Disciplina</th><th>Titular</th>
+          </tr>
+          <tr>
+            <td>Joi</td><td>8-10</td><td>sapt. 1</td><td>L001</td>
+            <td>MIE3</td><td>Laborator</td><td>Instrumente CASE</td><td>Conf. CHIOREAN Dan</td>
+          </tr>
+          <tr>
+            <td>Joi</td><td>8-10</td><td>sapt. 2</td><td>L001</td>
+            <td>MIE3</td><td>Laborator</td><td>Baze de Date</td><td>Lect. Popescu Ion</td>
+          </tr>
+          <tr>
+            <td>Vineri</td><td>10-12</td><td>sapt. 1-14</td><td>C309</td>
+            <td>MIE3</td><td>Curs</td><td>Algoritmi</td><td>Prof. Ionescu Maria</td>
+          </tr>
+        </table>
+      </body></html>`;
+
+      mockedAxios.get.mockResolvedValue({ data: html });
+      const result = await parseTimetable(validUrl);
+
+      expect(result.entries).toHaveLength(3);
+
+      // Check odd week (săptămână impară)
+      expect(result.entries[0].frequency).toBe('sapt. 1');
+      expect(result.entries[0].subject).toBe('Instrumente CASE');
+
+      // Check even week (săptămână pară)
+      expect(result.entries[1].frequency).toBe('sapt. 2');
+      expect(result.entries[1].subject).toBe('Baze de Date');
+
+      // Check all weeks
+      expect(result.entries[2].frequency).toBe('sapt. 1-14');
+      expect(result.entries[2].subject).toBe('Algoritmi');
     });
   });
 
