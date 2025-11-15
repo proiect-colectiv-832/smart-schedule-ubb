@@ -5,6 +5,7 @@ import { Optional_subject } from './entities/optional_subject';
 import { parseSpecializations } from './specialization-parser';
 import { parseTimetable } from './timetable-parser';
 import { parseCourseList } from './subject-list-parser';
+import { parseSubjectTimetable } from './subject-timetable-parser';
 import { TimetableEntry } from './types';
 
 const UBB_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar';
@@ -143,114 +144,68 @@ async function cacheFields(): Promise<Field[]> {
 }
 
 async function cacheSubjects(fields: Field[]): Promise<Optional_subject[]> {
-  console.log('📚 Step 2: Parsing timetables and caching subjects...\n');
+  console.log('📚 Step 2: Parsing individual subject timetables...\n');
 
-  // First, fetch the subject codes mapping
+  // Fetch the course list with codes
   console.log('   Fetching subject codes from course list...');
-  const courseCodeMap = new Map<string, string[]>(); // name -> [code1, code2, ...]
+  const subjects: Optional_subject[] = [];
+  const UBB_DISC_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/disc';
   
   try {
     const courseList = await parseCourseList(UBB_SUBJECTS_LIST_URL);
-    courseList.courses.forEach(course => {
-      const name = course.name.trim();
-      const code = course.code.trim();
-      if (!courseCodeMap.has(name)) {
-        courseCodeMap.set(name, []);
-      }
-      courseCodeMap.get(name)!.push(code);
-    });
-    console.log(`   ✅ Loaded ${courseList.courses.length} course codes for ${courseCodeMap.size} unique names\n`);
-  } catch (error) {
-    console.warn('   ⚠️  Failed to fetch course codes');
-    console.warn(`   Error: ${error instanceof Error ? error.message : String(error)}\n`);
-  }
-
-  // Parse group timetables to get entries
-  const allTimetableUrls: string[] = [];
-  fields.forEach(field => {
-    field.yearLinks.forEach(url => {
-      allTimetableUrls.push(url);
-    });
-  });
-
-  console.log(`   Total timetables to process: ${allTimetableUrls.length}`);
-
-  let processed = 0;
-  let failed = 0;
-  const subjectsMap = new Map<string, Optional_subject>();
-  const batchSize = 5;
-
-  for (let i = 0; i < allTimetableUrls.length; i += batchSize) {
-    const batch = allTimetableUrls.slice(i, i + batchSize);
-
-    await Promise.all(
-      batch.map(async (url) => {
-        try {
-          const timetable = await parseTimetable(url);
-          timetable.entries.forEach((entry: TimetableEntry) => {
-            const subjectName = entry.subject?.trim();
-            if (!subjectName) return;
-
-            let subject = subjectsMap.get(subjectName);
-            if (!subject) {
-              const codes = courseCodeMap.get(subjectName) || [];
-              subject = new Optional_subject({
-                name: subjectName,
-                code: codes.join(','), // Join multiple codes temporarily
-                timetableEntries: []
-              });
-              subjectsMap.set(subjectName, subject);
+    console.log(`   ✅ Found ${courseList.courses.length} courses\n`);
+    
+    console.log('   Parsing individual subject timetables...');
+    let processed = 0;
+    let failed = 0;
+    const batchSize = 10; // Increase batch size since these are simpler pages
+    
+    for (let i = 0; i < courseList.courses.length; i += batchSize) {
+      const batch = courseList.courses.slice(i, i + batchSize);
+      
+      await Promise.all(
+        batch.map(async (course) => {
+          try {
+            const subjectUrl = `${UBB_DISC_BASE_URL}/${course.href}`;
+            const entries = await parseSubjectTimetable(subjectUrl, course.name.trim());
+            
+            if (entries.length > 0) {
+              subjects.push(new Optional_subject({
+                name: course.name.trim(),
+                code: course.code.trim(),
+                timetableEntries: entries
+              }));
+              processed++;
+            } else {
+              failed++;
             }
-            subject.timetableEntries.push(entry);
-          });
-          processed++;
-        } catch (error) {
-          failed++;
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          
-          if (errorMessage.includes('Empty timetable page') || errorMessage.includes('No HTML tables found')) {
-            console.error(`   📋 Empty: ${url.split('/').pop()}`);
-          } else if (errorMessage.includes('Could not locate timetable table')) {
-            console.error(`   📋 No data: ${url.split('/').pop()}`);
-          } else {
-            console.error(`   ❌ Failed: ${errorMessage.substring(0, 60)}`);
+          } catch (error) {
+            failed++;
+            // Silently skip subjects without timetables
           }
-        }
-      })
-    );
-
-    if ((i + batchSize) % 10 === 0 || (i + batchSize) >= allTimetableUrls.length) {
-      console.log(`   Processed: ${Math.min(i + batchSize, allTimetableUrls.length)}/${allTimetableUrls.length}`);
+        })
+      );
+      
+      if ((i + batchSize) % 50 === 0 || (i + batchSize) >= courseList.courses.length) {
+        console.log(`   Processed: ${Math.min(i + batchSize, courseList.courses.length)}/${courseList.courses.length}`);
+      }
+      
+      if (i + batchSize < courseList.courses.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
-
-    if (i + batchSize < allTimetableUrls.length) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    
+    console.log(`\n✅ Successfully parsed: ${processed}/${courseList.courses.length} subjects`);
+    if (failed > 0) console.log(`⚠️  Failed/Empty: ${failed}`);
+    
+  } catch (error) {
+    console.error('   ❌ Failed to fetch course list:', error);
+    throw error;
   }
-
-  // Split subjects with multiple codes into separate entries
-  const subjects: Optional_subject[] = [];
-  subjectsMap.forEach((subject) => {
-    if (subject.code && subject.code.includes(',')) {
-      const codes = subject.code.split(',');
-      codes.forEach(code => {
-        subjects.push(new Optional_subject({
-          name: subject.name,
-          code: code.trim(),
-          timetableEntries: [...subject.timetableEntries]
-        }));
-      });
-    } else {
-      subjects.push(subject);
-    }
-  });
-
+  
   await saveSubjectsToFile(subjects);
-
-  console.log(`\n✅ Processed: ${processed}/${allTimetableUrls.length}`);
-  if (failed > 0) console.log(`⚠️  Failed: ${failed}`);
-  console.log(`📊 Subjects cached: ${subjects.length} (from ${subjectsMap.size} unique names)\n`);
-
+  console.log(`📊 Subjects cached: ${subjects.length}\n`);
+  
   return subjects;
 }
 
