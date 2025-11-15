@@ -4,10 +4,12 @@ import { Field } from './entities/field';
 import { Optional_subject } from './entities/optional_subject';
 import { parseSpecializations } from './specialization-parser';
 import { parseTimetable } from './timetable-parser';
+import { parseCourseList } from './subject-list-parser';
 import { TimetableEntry } from './types';
 
 const UBB_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar';
 const UBB_INDEX_URL = `${UBB_BASE_URL}/index.html`;
+const UBB_SUBJECTS_LIST_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/disc/index.html';
 const CACHE_DIR = path.join(__dirname, '..', 'cache');
 const FIELDS_CACHE_FILE = path.join(CACHE_DIR, 'fields.json');
 const SUBJECTS_CACHE_FILE = path.join(CACHE_DIR, 'subjects.json');
@@ -143,6 +145,26 @@ async function cacheFields(): Promise<Field[]> {
 async function cacheSubjects(fields: Field[]): Promise<Optional_subject[]> {
   console.log('📚 Step 2: Parsing timetables and caching subjects...\n');
 
+  // First, fetch the subject codes mapping
+  console.log('   Fetching subject codes from course list...');
+  // Map subject names to arrays of codes (handles multiple codes per name)
+  let subjectNameToCodesMap = new Map<string, string[]>();
+  try {
+    const courseList = await parseCourseList(UBB_SUBJECTS_LIST_URL);
+    courseList.courses.forEach(course => {
+      const name = course.name.trim();
+      const code = course.code.trim();
+      if (!subjectNameToCodesMap.has(name)) {
+        subjectNameToCodesMap.set(name, []);
+      }
+      subjectNameToCodesMap.get(name)!.push(code);
+    });
+    console.log(`   ✅ Loaded ${courseList.courses.length} subject codes for ${subjectNameToCodesMap.size} unique names\n`);
+  } catch (error) {
+    console.warn('   ⚠️  Failed to fetch subject codes, subjects will have empty codes');
+    console.warn(`   Error: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+
   const allTimetableUrls: string[] = [];
   fields.forEach(field => {
     field.yearLinks.forEach(url => {
@@ -170,9 +192,12 @@ async function cacheSubjects(fields: Field[]): Promise<Optional_subject[]> {
 
             let subject = subjectsMap.get(subjectName);
             if (!subject) {
+              // Get all codes for this subject name, join them with commas if multiple
+              const codes = subjectNameToCodesMap.get(subjectName) || [];
+              const code = codes.length > 0 ? codes.join(',') : '';
               subject = new Optional_subject({
                 name: subjectName,
-                code: '',
+                code: code,
                 timetableEntries: []
               });
               subjectsMap.set(subjectName, subject);
@@ -207,12 +232,30 @@ async function cacheSubjects(fields: Field[]): Promise<Optional_subject[]> {
     }
   }
 
-  const subjects = Array.from(subjectsMap.values());
+  // Split subjects with multiple codes into separate entries
+  const subjects: Optional_subject[] = [];
+  subjectsMap.forEach((subject) => {
+    if (subject.code && subject.code.includes(',')) {
+      // Multiple codes - create separate subject for each code
+      const codes = subject.code.split(',');
+      codes.forEach(code => {
+        subjects.push(new Optional_subject({
+          name: subject.name,
+          code: code.trim(),
+          timetableEntries: [...subject.timetableEntries] // Copy entries for each code
+        }));
+      });
+    } else {
+      // Single code or no code - add as is
+      subjects.push(subject);
+    }
+  });
+
   await saveSubjectsToFile(subjects);
 
   console.log(`\n✅ Processed: ${processed}/${allTimetableUrls.length}`);
   if (failed > 0) console.log(`⚠️  Failed: ${failed}`);
-  console.log(`📊 Subjects cached: ${subjects.length}\n`);
+  console.log(`📊 Subjects cached: ${subjects.length} (expanded from ${subjectsMap.size} unique names)\n`);
 
   return subjects;
 }

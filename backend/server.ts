@@ -283,12 +283,14 @@ app.get('/subjects', async (req: Request, res: Response) => {
   try {
     const subjects = await getAllSubjects();
 
-    // Transform subjects to match frontend format
-    const subjectsData = subjects.map((subject, index) => ({
-      id: index + 1,
+    // Transform subjects to match frontend format with code as id
+    let globalEntryId = 1;
+    const subjectsData = subjects.map((subject) => ({
+      id: subject.code || `unknown-${subject.name.replace(/\s+/g, '-')}`, // Use code as id, fallback to sanitized name
       name: subject.name,
-      entries: subject.timetableEntries.map((entry, entryIndex) =>
-        transformTimetableEntry(entry, (index + 1) * 1000 + entryIndex)
+      code: subject.code, // Include code explicitly
+      entries: subject.timetableEntries.map(entry =>
+        transformTimetableEntry(entry, globalEntryId++)
       )
     }));
 
@@ -367,31 +369,6 @@ app.get('/subjects/search', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to search subjects',
-      message: error.message || 'Unknown error occurred',
-    });
-  }
-});
-
-// Get all subjects - matches frontend API spec
-app.get('/subjects', async (req: Request, res: Response) => {
-  try {
-    const subjects = await getAllSubjects();
-
-    // Transform to frontend format with entries
-    let globalEntryId = 1;
-    const subjectsData = subjects.map((subject, index) => ({
-      id: index + 1,
-      name: subject.name,
-      entries: subject.timetableEntries.map(entry =>
-        transformTimetableEntry(entry, globalEntryId++)
-      )
-    }));
-
-    res.json(subjectsData);
-  } catch (error: any) {
-    console.error('Error loading subjects:', error);
-    res.status(500).json({
-      error: 'Failed to load subjects',
       message: error.message || 'Unknown error occurred',
     });
   }
