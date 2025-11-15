@@ -288,7 +288,6 @@ app.get('/subjects', async (req: Request, res: Response) => {
     const subjectsData = subjects.map((subject) => ({
       id: subject.code || `unknown-${subject.name.replace(/\s+/g, '-')}`, // Use code as id, fallback to sanitized name
       name: subject.name,
-      code: subject.code, // Include code explicitly
       entries: subject.timetableEntries.map(entry =>
         transformTimetableEntry(entry, globalEntryId++)
       )
