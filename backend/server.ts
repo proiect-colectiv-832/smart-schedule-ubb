@@ -7,7 +7,7 @@ import {
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash,
-} from './src/timetable-parser';
+} from './src/parsers/timetable-parser';
 import { Timetable, TimetableEntry } from './src/types';
 import {
   initializeCache,
@@ -17,7 +17,7 @@ import {
   getSubject,
   searchSubjects,
   getCacheStats
-} from './src/cache-manager';
+} from './src/cache/cache-manager';
 import {
   createNotification,
   getNotifications,
@@ -28,9 +28,39 @@ import {
   getNotificationStats,
   createScheduleChangeNotification,
   cleanupExpiredNotifications
-} from './src/notification-manager';
-import { NotificationType, NotificationPriority } from './src/notification-types';
-import { PushNotificationManager } from './src/push-notification-manager';
+} from './src/notifications/notification-manager';
+import { NotificationType, NotificationPriority } from './src/notifications/notification-types';
+import { PushNotificationManager } from './src/notifications/push-notification-manager';
+import {
+  initializeTokenManager,
+  generateCalendarToken,
+  getUserIdFromToken,
+  revokeCalendarToken,
+  revokeUserTokens,
+  getUserTokens,
+  getTokenStats
+} from './src/calendar-subscription/calendar-token-manager';
+import {
+  initializeUserTimetableManager,
+  getUserTimetable,
+  saveUserTimetable,
+  addUserEvent,
+  updateUserEvent,
+  deleteUserEvent,
+  deleteUserTimetable,
+  getUserTimetableStats,
+  UserEvent
+} from './src/calendar-subscription/user-timetable-manager';
+import {
+  generateICalendar,
+  generateICalendarForDateRange,
+  validateICalendar,
+  getCalendarMetadata
+} from './src/calendar-subscription/icalendar-generator';
+import {
+  convertTimetableEntriesToEvents,
+  getDefaultSemesterDates
+} from './src/calendar-subscription/timetable-to-events-converter';
 
 const app = express();
 const server = http.createServer(app);
@@ -164,6 +194,22 @@ app.get('/', (req: Request, res: Response) => {
       'GET /push/stats': 'Get push notification statistics',
       'POST /push/send': 'Send push notification to specific users',
       'POST /push/broadcast': 'Broadcast notification to all users',
+      'POST /calendar/generate-token': 'Generate calendar subscription token',
+      'GET /calendar/token/:token': 'Get user ID from calendar token',
+      'DELETE /calendar/token/:token': 'Revoke calendar token',
+      'POST /calendar/revoke': 'Revoke all tokens for a user',
+      'GET /calendar/tokens': 'Get all tokens for a user',
+      'GET /calendar/token-stats': 'Get statistics about calendar tokens',
+      'POST /timetable/user': 'Save or update user timetable',
+      'GET /timetable/user': 'Get user timetable',
+      'DELETE /timetable/user': 'Delete user timetable',
+      'POST /timetable/event': 'Add or update user event',
+      'DELETE /timetable/event': 'Delete user event',
+      'GET /timetable/stats': 'Get user timetable statistics',
+      'GET /icalendar/generate': 'Generate iCalendar file',
+      'GET /icalendar/validate': 'Validate iCalendar file',
+      'GET /icalendar/metadata': 'Get metadata from iCalendar file',
+      'GET /timetable/events/default-dates': 'Get default semester dates for events',
     },
     exampleUsage: {
       teachers: 'GET /teachers',
@@ -288,7 +334,7 @@ app.get('/subjects', async (req: Request, res: Response) => {
     const subjectsData = subjects.map((subject) => ({
       id: subject.code || `unknown-${subject.name.replace(/\s+/g, '-')}`, // Use code as id, fallback to sanitized name
       name: subject.name,
-      entries: subject.timetableEntries.map(entry =>
+      entries: subject.timetableEntries.map((entry: TimetableEntry) =>
         transformTimetableEntry(entry, globalEntryId++)
       )
     }));
@@ -381,7 +427,7 @@ app.get('/teachers', async (req: Request, res: Response) => {
     // Extract unique teacher names from all subjects
     const teacherSet = new Set<string>();
     subjects.forEach(subject => {
-      subject.timetableEntries.forEach(entry => {
+      subject.timetableEntries.forEach((entry: TimetableEntry) => {
         if (entry.teacher && entry.teacher.trim() !== '') {
           teacherSet.add(entry.teacher.trim());
         }
@@ -414,7 +460,7 @@ app.get('/teacher/:teacherName/timetable', async (req: Request, res: Response) =
     let entryId = 1;
 
     subjects.forEach(subject => {
-      subject.timetableEntries.forEach(entry => {
+      subject.timetableEntries.forEach((entry: TimetableEntry) => {
         if (entry.teacher && entry.teacher.trim() === teacherName) {
           teacherEntries.push(transformTimetableEntry(entry, entryId++));
         }
@@ -1150,6 +1196,629 @@ app.post('/push/broadcast', async (req: Request, res: Response) => {
 
 // === END PUSH NOTIFICATION ENDPOINTS ===
 
+// ============== CALENDAR SUBSCRIPTION ENDPOINTS ==============
+
+// Generate calendar subscription token for a user
+app.post('/calendar/generate-token', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const token = await generateCalendarToken(userId);
+    const subscriptionUrl = `${req.protocol}://${req.get('host')}/calendar/${token}.ics`;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        token,
+        subscriptionUrl,
+        usage: {
+          appleCalendar: 'Open Calendar app → File → New Calendar Subscription → paste URL',
+          googleCalendar: 'Open Google Calendar → Other calendars (+) → From URL → paste URL',
+          outlook: 'Open Outlook → Add Calendar → Subscribe from web → paste URL',
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('Error generating calendar token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate calendar token',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user ID from calendar token (for debugging)
+app.get('/calendar/token/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const userId = await getUserIdFromToken(token);
+
+    if (!userId) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invalid token',
+        message: 'Token not found or expired',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { userId }
+    });
+  } catch (error: any) {
+    console.error('Error getting user from token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user from token',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Revoke a calendar token
+app.delete('/calendar/token/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const revoked = await revokeCalendarToken(token);
+
+    if (!revoked) {
+      return res.status(404).json({
+        success: false,
+        error: 'Token not found',
+        message: 'No token found with the provided value',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Calendar token revoked successfully'
+    });
+  } catch (error: any) {
+    console.error('Error revoking calendar token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to revoke calendar token',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Revoke all tokens for a user
+app.post('/calendar/revoke', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const count = await revokeUserTokens(userId);
+
+    res.json({
+      success: true,
+      message: `Revoked ${count} tokens for user`,
+      data: { revokedCount: count }
+    });
+  } catch (error: any) {
+    console.error('Error revoking user tokens:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to revoke user tokens',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get all tokens for a user
+app.get('/calendar/tokens', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const tokens = getUserTokens(userId as string);
+
+    res.json({
+      success: true,
+      data: { tokens }
+    });
+  } catch (error: any) {
+    console.error('Error getting user tokens:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user tokens',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get calendar token statistics
+app.get('/calendar/token-stats', async (req: Request, res: Response) => {
+  try {
+    const stats = getTokenStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    console.error('Error getting token stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get token statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== USER TIMETABLE MANAGEMENT ENDPOINTS ==============
+
+// Save or update user's timetable
+app.post('/timetable/user', async (req: Request, res: Response) => {
+  try {
+    const { userId, events, semesterStart, semesterEnd } = req.body;
+
+    if (!userId || !events) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and events are required',
+      });
+    }
+
+    const parsedSemesterStart = semesterStart ? new Date(semesterStart) : undefined;
+    const parsedSemesterEnd = semesterEnd ? new Date(semesterEnd) : undefined;
+
+    // Parse date strings in events
+    const parsedEvents = events.map((event: any) => ({
+      ...event,
+      startTime: new Date(event.startTime),
+      endTime: new Date(event.endTime),
+      recurrenceRule: event.recurrenceRule ? {
+        ...event.recurrenceRule,
+        until: event.recurrenceRule.until ? new Date(event.recurrenceRule.until) : undefined,
+      } : undefined,
+    }));
+
+    const timetable = await saveUserTimetable(userId, parsedEvents, parsedSemesterStart, parsedSemesterEnd);
+
+    res.json({
+      success: true,
+      data: timetable,
+      message: 'Timetable saved successfully'
+    });
+  } catch (error: any) {
+    console.error('Error saving user timetable:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user's timetable
+app.get('/timetable/user', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const timetable = await getUserTimetable(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: timetable
+    });
+  } catch (error: any) {
+    console.error('Error getting user timetable:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete user's timetable
+app.delete('/timetable/user', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const deleted = await deleteUserTimetable(userId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Timetable deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting user timetable:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Add or update a user event
+app.post('/timetable/event', async (req: Request, res: Response) => {
+  try {
+    const { userId, event } = req.body;
+
+    if (!userId || !event) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and event are required',
+      });
+    }
+
+    // Parse dates
+    const parsedEvent = {
+      ...event,
+      startTime: new Date(event.startTime),
+      endTime: new Date(event.endTime),
+      recurrenceRule: event.recurrenceRule ? {
+        ...event.recurrenceRule,
+        until: event.recurrenceRule.until ? new Date(event.recurrenceRule.until) : undefined,
+      } : undefined,
+    };
+
+    let result: UserEvent | null;
+
+    if (event.id) {
+      // Update existing event
+      result = await updateUserEvent(userId, event.id, parsedEvent);
+    } else {
+      // Add new event
+      result = await addUserEvent(userId, parsedEvent);
+    }
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Event not found',
+        message: 'Could not update event - event or user not found',
+      });
+    }
+
+    res.status(event.id ? 200 : 201).json({
+      success: true,
+      data: result,
+      message: event.id ? 'Event updated successfully' : 'Event added successfully'
+    });
+  } catch (error: any) {
+    console.error('Error saving user event:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save user event',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete a user event
+app.delete('/timetable/event', async (req: Request, res: Response) => {
+  try {
+    const { userId, eventId } = req.body;
+
+    if (!userId || !eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and eventId are required',
+      });
+    }
+
+    const deleted = await deleteUserEvent(userId, eventId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Event not found',
+        message: 'Could not delete event - event or user not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Event deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting user event:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete user event',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user timetable statistics
+app.get('/timetable/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = getUserTimetableStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    console.error('Error getting timetable stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get timetable statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== ICALENDAR GENERATION ENDPOINTS ==============
+
+// Serve iCalendar feed for a user (the main subscription endpoint)
+app.get('/calendar/:token.ics', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const {
+      language = 'ro-en',
+      isTerminalYear = 'false',
+      includeVacations = 'true',
+      includeExamPeriods = 'true'
+    } = req.query;
+
+    // Validate token and get user ID
+    const userId = await getUserIdFromToken(token);
+
+    if (!userId) {
+      return res.status(404).send('Calendar not found. The subscription link may be invalid or expired.');
+    }
+
+    // Get user's timetable
+    const timetable = await getUserTimetable(userId);
+
+    if (!timetable || timetable.events.length === 0) {
+      return res.status(404).send('No events found in your timetable. Please add some events first.');
+    }
+
+    // Generate iCalendar feed with academic calendar integration
+    const icalString = await generateICalendar(timetable, userId, {
+      language: language as 'ro-en' | 'hu-de',
+      isTerminalYear: isTerminalYear === 'true',
+      includeVacations: includeVacations === 'true',
+      includeExamPeriods: includeExamPeriods === 'true'
+    });
+
+    // Set proper headers for calendar subscription
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline; filename="calendar.ics"');
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
+    res.setHeader('X-WR-CALNAME', 'UBB Smart Schedule');
+    res.setHeader('X-WR-CALDESC', 'Your personalized UBB timetable');
+
+    res.send(icalString);
+
+    console.log(`📅 Served calendar for user ${userId} (${timetable.events.length} events, lang: ${language}, terminal: ${isTerminalYear})`);
+  } catch (error: any) {
+    console.error('Error serving iCalendar:', error);
+    res.status(500).send('Error generating calendar. Please try again later.');
+  }
+});
+
+// Generate iCalendar for testing/preview (requires userId)
+app.get('/icalendar/generate', async (req: Request, res: Response) => {
+  try {
+    const {
+      userId,
+      startDate,
+      endDate,
+      format,
+      language = 'ro-en',
+      isTerminalYear = 'false',
+      includeVacations = 'true',
+      includeExamPeriods = 'true'
+    } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const timetable = await getUserTimetable(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    const options = {
+      language: language as 'ro-en' | 'hu-de',
+      isTerminalYear: isTerminalYear === 'true',
+      includeVacations: includeVacations === 'true',
+      includeExamPeriods: includeExamPeriods === 'true'
+    };
+
+    let icalString: string;
+
+    if (startDate && endDate) {
+      icalString = await generateICalendarForDateRange(
+        timetable,
+        userId as string,
+        new Date(startDate as string),
+        new Date(endDate as string),
+        options
+      );
+    } else {
+      icalString = await generateICalendar(timetable, userId as string, options);
+    }
+
+    if (format === 'json') {
+      // Return as JSON for debugging
+      res.json({
+        success: true,
+        data: {
+          icalendar: icalString,
+          metadata: getCalendarMetadata(timetable),
+          options: options
+        }
+      });
+    } else {
+      // Return as .ics file
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="timetable.ics"');
+      res.send(icalString);
+    }
+  } catch (error: any) {
+    console.error('Error generating iCalendar:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate iCalendar',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Validate an iCalendar string
+app.post('/icalendar/validate', async (req: Request, res: Response) => {
+  try {
+    const { icalendar } = req.body;
+
+    if (!icalendar) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing iCalendar data',
+        message: 'icalendar string is required in the request body',
+      });
+    }
+
+    const validation = validateICalendar(icalendar);
+
+    res.json({
+      success: true,
+      data: validation
+    });
+  } catch (error: any) {
+    console.error('Error validating iCalendar:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to validate iCalendar',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get calendar metadata for a user
+app.get('/icalendar/metadata', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const timetable = await getUserTimetable(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    const metadata = getCalendarMetadata(timetable);
+
+    res.json({
+      success: true,
+      data: metadata
+    });
+  } catch (error: any) {
+    console.error('Error getting calendar metadata:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get calendar metadata',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get default semester dates
+app.get('/timetable/events/default-dates', async (req: Request, res: Response) => {
+  try {
+    const dates = getDefaultSemesterDates();
+    res.json({
+      success: true,
+      data: dates
+    });
+  } catch (error: any) {
+    console.error('Error getting default dates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get default semester dates',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// === END CALENDAR ENDPOINTS ===
+
 // Create hash for a timetable
 app.post('/hash', async (req: Request, res: Response) => {
   try {
@@ -1247,6 +1916,24 @@ async function startServer() {
     console.error('   Error:', error instanceof Error ? error.message : error);
   }
 
+  // Initialize calendar token manager
+  try {
+    await initializeTokenManager();
+    console.log('🔐 Calendar token manager initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize calendar token manager');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
+  // Initialize user timetable manager
+  try {
+    await initializeUserTimetableManager();
+    console.log('📅 User timetable manager initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize user timetable manager');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
   // Initialize push notification manager
   pushManager = new PushNotificationManager(server);
   console.log('📱 Push notification manager initialized');
@@ -1262,6 +1949,7 @@ async function startServer() {
     console.log(`📢 Notifications: http://localhost:${PORT}/notifications`);
     console.log(`📱 Push Notifications: WebSocket + Web Push enabled`);
     console.log(`🔑 VAPID Public Key: http://localhost:${PORT}/push/vapid-public-key`);
+    console.log(`📅 Calendar Subscriptions: http://localhost:${PORT}/calendar/{token}.ics`);
     console.log('='.repeat(60));
     
     // Set up periodic cleanup of expired notifications (every hour)
