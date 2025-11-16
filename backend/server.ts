@@ -426,7 +426,7 @@ app.get('/teachers', async (req: Request, res: Response) => {
 
     // Extract unique teacher names from all subjects
     const teacherSet = new Set<string>();
-    subjects.forEach(subject => {
+    subjects.forEach((subject: { name: string; code: string; timetableEntries: TimetableEntry[] }) => {
       subject.timetableEntries.forEach((entry: TimetableEntry) => {
         if (entry.teacher && entry.teacher.trim() !== '') {
           teacherSet.add(entry.teacher.trim());
