@@ -276,7 +276,7 @@ app.get('/fields', async (req: Request, res: Response) => {
     const fields = await getAllFields();
 
     // Return array of fields with id, name, and years
-    const fieldsData = fields.map((field, index) => ({
+    const fieldsData = fields.map((field: { name: string; years: number[] }, index: number) => ({
       id: index + 1,
       name: field.name,
       years: field.years,
@@ -331,7 +331,7 @@ app.get('/subjects', async (req: Request, res: Response) => {
 
     // Transform subjects to match frontend format with code as id
     let globalEntryId = 1;
-    const subjectsData = subjects.map((subject) => ({
+    const subjectsData = subjects.map((subject: { name: string; code: string; timetableEntries: TimetableEntry[] }) => ({
       id: subject.code || `unknown-${subject.name.replace(/\s+/g, '-')}`, // Use code as id, fallback to sanitized name
       name: subject.name,
       entries: subject.timetableEntries.map((entry: TimetableEntry) =>
@@ -400,7 +400,7 @@ app.get('/subjects/search', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        subjects: results.map(subject => ({
+        subjects: results.map((subject: { name: string; code: string; timetableEntries: TimetableEntry[] }) => ({
           name: subject.name,
           code: subject.code,
           entriesCount: subject.timetableEntries.length,
@@ -459,7 +459,7 @@ app.get('/teacher/:teacherName/timetable', async (req: Request, res: Response) =
     const teacherEntries: any[] = [];
     let entryId = 1;
 
-    subjects.forEach(subject => {
+    subjects.forEach((subject: { timetableEntries: TimetableEntry[] }) => {
       subject.timetableEntries.forEach((entry: TimetableEntry) => {
         if (entry.teacher && entry.teacher.trim() === teacherName) {
           teacherEntries.push(transformTimetableEntry(entry, entryId++));
