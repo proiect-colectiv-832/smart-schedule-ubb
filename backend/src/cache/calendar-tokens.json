@@ -1,0 +1,14 @@
+[
+  {
+    "userId": "test-user-1763293925562",
+    "token": "640ed8da-a847-440c-9a1a-9edcddd4a58a",
+    "createdAt": "2025-11-16T11:52:05.838Z",
+    "lastAccessedAt": "2025-11-16T11:55:20.638Z"
+  },
+  {
+    "userId": "test-user-1763294519914",
+    "token": "2c074b52-e571-4267-940d-789a5df85e84",
+    "createdAt": "2025-11-16T12:01:59.976Z",
+    "lastAccessedAt": "2025-11-16T12:01:59.976Z"
+  }
+]
