@@ -1,0 +1,368 @@
+[
+  {
+    "name": "Matematica - linia de studiu romana",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/M1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/M2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/M3.html"
+    }
+  },
+  {
+    "name": "Informatica - linia de studiu romana",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/I1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/I2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/I3.html"
+    }
+  },
+  {
+    "name": "Matematica informatica - linia de studiu romana",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MI1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MI2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MI3.html"
+    }
+  },
+  {
+    "name": "Matematica-Informatica 4 ani - linia de studiu romana",
+    "years": [
+      1
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIDS1.html"
+    }
+  },
+  {
+    "name": "Matematica informatica - linia de studiu engleza",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html"
+    }
+  },
+  {
+    "name": "Matematica - linia de studiu maghiara",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MM1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MM2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MM3.html"
+    }
+  },
+  {
+    "name": "Informatica - linia de studiu maghiara",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IM1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IM2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IM3.html"
+    }
+  },
+  {
+    "name": "Matematica informatica - linia de studiu maghiara",
+    "years": [
+      2,
+      3
+    ],
+    "yearLinks": {
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIM2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIM3.html"
+    }
+  },
+  {
+    "name": "Ingineria Informatiei in limba maghiara",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IIM1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IIM2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IIM3.html"
+    }
+  },
+  {
+    "name": "Matematica-Informatica 4 ani - linia de studiu maghiara",
+    "years": [
+      1
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIMDS1.html"
+    }
+  },
+  {
+    "name": "Informatica - in limba germana",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IG1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IG2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IG3.html"
+    }
+  },
+  {
+    "name": "Informatica - in limba engleza",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IE1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IE2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IE3.html"
+    }
+  },
+  {
+    "name": "Inteligenta Artificiala in limba engleza",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IA1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IA2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/IA3.html"
+    }
+  },
+  {
+    "name": "Ingineria Informatiei in limba engleza",
+    "years": [
+      1,
+      2,
+      3
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/II1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/II2.html",
+      "3": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/II3.html"
+    }
+  },
+  {
+    "name": "Metode moderne in predarea matematicii",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaMetModDid1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaMetModDid2.html"
+    }
+  },
+  {
+    "name": "Matematici Avansate - in limba engleza",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaMAv1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaMAv2.html"
+    }
+  },
+  {
+    "name": "Metode moderne in predarea matematicii - in limba maghiara",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaMetModDidm1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaMetModDidm2.html"
+    }
+  },
+  {
+    "name": "Baze de date",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaBD1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaBD2.html"
+    }
+  },
+  {
+    "name": "Sisteme distribuite in Internet",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaSD1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaSD2.html"
+    }
+  },
+  {
+    "name": "Inginerie software - in limba engleza",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaIS1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaIS2.html"
+    }
+  },
+  {
+    "name": "Inteligenta Computationala Aplicata - in limba engleza",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaICA1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaICA2.html"
+    }
+  },
+  {
+    "name": "Calcul de inalta performanta - in limba engleza",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaCIP1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaCIP2.html"
+    }
+  },
+  {
+    "name": "Sisteme informatice avansate: modelare, proiectare, dezvoltare - germana si engleza",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaSIA1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaSIA2.html"
+    }
+  },
+  {
+    "name": "Stiinta datelor in industrie si societate",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaDataSci1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaDataSci2.html"
+    }
+  },
+  {
+    "name": "Securitate cibernetica",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/Cyber1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/Cyber2.html"
+    }
+  },
+  {
+    "name": "Analiza datelor si modelare - in limba maghiara",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/ADM1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/ADM2.html"
+    }
+  },
+  {
+    "name": "Proiectarea si dezvoltarea aplicatiilor Enterprise",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/PDAE1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/PDAE2.html"
+    }
+  },
+  {
+    "name": "Inteligenta artificiala pentru industrii conectate - in limba engleza",
+    "years": [
+      1
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MaAI4CI1.html"
+    }
+  },
+  {
+    "name": "Cloud, infrastructura de retea si calcul de inalta performanta - in limba engleza",
+    "years": [
+      1
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/CNIHPC1.html"
+    }
+  },
+  {
+    "name": "Masterat didactic in Informatica - in limba romana",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/StEduID1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/StEduID2.html"
+    }
+  },
+  {
+    "name": "Masterat didactic in Matematica - in limba maghiara",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/StEduMDm1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/StEduMDm2.html"
+    }
+  },
+  {
+    "name": "Masterat didactic in Informatica - in limba maghiara",
+    "years": [
+      1,
+      2
+    ],
+    "yearLinks": {
+      "1": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/StEduIDm1.html",
+      "2": "https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/StEduIDm2.html"
+    }
+  }
+]

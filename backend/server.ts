@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as http from 'http';
@@ -61,6 +62,20 @@ import {
   convertTimetableEntriesToEvents,
   getDefaultSemesterDates
 } from './src/calendar-subscription/timetable-to-events-converter';
+import {
+  initializeMongoDB,
+  getDatabase,
+  closeMongoDBConnection,
+  isConnected
+} from './src/database';
+import {
+  saveUserTimetable as saveUserTimetableDB,
+  getUserTimetable as getUserTimetableDB,
+  deleteUserTimetable as deleteUserTimetableDB,
+  getUserTimetableStats as getUserTimetableStatsDB,
+  createUserTimetableIndexes,
+  UserTimetableEntry
+} from './src/database/user-timetable-db';
 
 const app = express();
 const server = http.createServer(app);
@@ -147,7 +162,7 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
     frequency,
     type,
     room: entry.room || '',
-    format: entry.group || ''  // MIE3, 832, 831/1, etc. - valoarea din coloana Formatia
+    format: entry.group || ''  
   };
 }
 
@@ -206,6 +221,10 @@ app.get('/', (req: Request, res: Response) => {
       'POST /timetable/event': 'Add or update user event',
       'DELETE /timetable/event': 'Delete user event',
       'GET /timetable/stats': 'Get user timetable statistics',
+      'POST /user-timetable': 'Save/update user timetable (mobile app)',
+      'GET /user-timetable': 'Get user timetable from MongoDB (mobile app)',
+      'DELETE /user-timetable': 'Delete user timetable from MongoDB (mobile app)',
+      'GET /user-timetable/stats': 'Get user timetable statistics from MongoDB',
       'GET /icalendar/generate': 'Generate iCalendar file',
       'GET /icalendar/validate': 'Validate iCalendar file',
       'GET /icalendar/metadata': 'Get metadata from iCalendar file',
@@ -223,12 +242,72 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', async (req: Request, res: Response) => {
+  const mongoStatus = process.env.MONGODB_URI ? await isConnected() : null;
+  
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    services: {
+      mongodb: mongoStatus !== null ? (mongoStatus ? 'connected' : 'disconnected') : 'not configured',
+    },
   });
+});
+
+// MongoDB connection status endpoint
+app.get('/mongodb/status', async (req: Request, res: Response) => {
+  try {
+    const hasUri = !!process.env.MONGODB_URI;
+    const connected = hasUri ? await isConnected() : false;
+    const db = getDatabase();
+    
+    let details: any = {
+      configured: hasUri,
+      connected,
+      databaseName: process.env.MONGODB_DB_NAME || 'smart-schedule',
+    };
+
+    if (hasUri) {
+      if (connected && db) {
+        // Try to get some database stats
+        try {
+          const adminDb = db.admin();
+          const serverStatus = await adminDb.serverStatus();
+          details.serverInfo = {
+            version: serverStatus.version,
+            host: serverStatus.host,
+            uptime: serverStatus.uptime,
+          };
+          
+          // List collections to verify we can access the database
+          const collections = await db.listCollections().toArray();
+          details.collections = collections.map((c: any) => c.name);
+          details.collectionCount = collections.length;
+        } catch (error) {
+          details.error = error instanceof Error ? error.message : 'Unknown error';
+        }
+      } else {
+        details.error = 'Not connected to MongoDB';
+        details.connectionString = process.env.MONGODB_URI 
+          ? process.env.MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') // Hide credentials
+          : 'Not set';
+      }
+    } else {
+      details.message = 'MONGODB_URI environment variable is not set';
+    }
+
+    res.json({
+      success: true,
+      data: details,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check MongoDB status',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
 });
 
 // Get cache statistics
@@ -1601,6 +1680,215 @@ app.get('/timetable/stats', async (req: Request, res: Response) => {
   }
 });
 
+// ============== USER TIMETABLE SYNC ENDPOINT (MongoDB) ==============
+
+// Save/update user timetable from mobile app
+app.post('/user-timetable', async (req: Request, res: Response) => {
+  try {
+    const { userId, entries } = req.body;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    if (!entries || !Array.isArray(entries)) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing or invalid entries',
+        message: 'entries must be an array',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    // Validate each entry has the required structure
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const requiredFields = ['id', 'day', 'sh', 'sm', 'eh', 'em', 'subject', 'teacher', 'freq', 'type', 'room', 'format'];
+      
+      for (const field of requiredFields) {
+        if (entry[field] === undefined || entry[field] === null) {
+          return res.status(400).json({
+            hasErrors: true,
+            error: 'Invalid entry format',
+            message: `Entry at index ${i} is missing required field: ${field}`,
+          });
+        }
+      }
+    }
+
+    // Save the timetable
+    const savedTimetable = await saveUserTimetableDB(userId, entries as UserTimetableEntry[]);
+
+    res.status(200).json({
+      hasErrors: false,
+      success: true,
+      message: 'Timetable saved successfully',
+      data: {
+        userId: savedTimetable.userId,
+        entriesCount: savedTimetable.entries.length,
+        updatedAt: savedTimetable.updatedAt,
+      },
+    });
+
+    console.log(`✅ Saved timetable for user ${userId} (${entries.length} entries)`);
+  } catch (error: any) {
+    console.error('Error saving user timetable:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to save user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user timetable from MongoDB
+app.get('/user-timetable', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    const timetable = await getUserTimetableDB(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        hasErrors: true,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      data: {
+        userId: timetable.userId,
+        entries: timetable.entries,
+        createdAt: timetable.createdAt,
+        updatedAt: timetable.updatedAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error getting user timetable:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to get user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete user timetable from MongoDB
+app.delete('/user-timetable', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    const deleted = await deleteUserTimetableDB(userId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        hasErrors: true,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      message: 'Timetable deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Error deleting user timetable:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to delete user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user timetable statistics from MongoDB
+app.get('/user-timetable/stats', async (req: Request, res: Response) => {
+  try {
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    const stats = await getUserTimetableStatsDB();
+    res.json({
+      hasErrors: false,
+      success: true,
+      data: stats,
+    });
+  } catch (error: any) {
+    console.error('Error getting user timetable stats:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to get user timetable statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
 // ============== ICALENDAR GENERATION ENDPOINTS ==============
 
 // Serve iCalendar feed for a user (the main subscription endpoint)
@@ -1907,6 +2195,25 @@ async function startServer() {
   console.log('🎓 UBB Timetable Parser API');
   console.log('='.repeat(60));
 
+  // Initialize MongoDB connection
+  if (process.env.MONGODB_URI) {
+    try {
+      await initializeMongoDB();
+      
+      // Create indexes for user timetables
+      try {
+        await createUserTimetableIndexes();
+      } catch (error) {
+        console.error('⚠️  Warning: Failed to create user timetable indexes');
+        console.error('   Error:', error instanceof Error ? error.message : error);
+      }
+    } catch (error) {
+      console.error('⚠️  Warning: Failed to connect to MongoDB');
+      console.error('   MongoDB connection is optional. Server will continue without it.');
+      console.error('   Error:', error instanceof Error ? error.message : error);
+    }
+  }
+
   // Initialize cache at startup
   try {
     await initializeCache();
@@ -1962,6 +2269,35 @@ async function startServer() {
     }, 60 * 60 * 1000); // 1 hour
   });
 }
+
+// Graceful shutdown handler
+async function gracefulShutdown(signal: string) {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  try {
+    // Close MongoDB connection
+    await closeMongoDBConnection();
+    
+    // Close HTTP server
+    server.close(() => {
+      console.log('✅ Server closed successfully');
+      process.exit(0);
+    });
+    
+    // Force close after 10 seconds
+    setTimeout(() => {
+      console.error('⚠️  Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start the server
 startServer().catch((error) => {
