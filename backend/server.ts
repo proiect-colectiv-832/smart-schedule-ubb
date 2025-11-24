@@ -1697,7 +1697,7 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
     }
 
     if (!entries || !Array.isArray(entries)) {
-      return res.status(400).json({
+      return res.status(401).json({
         hasErrors: true,
         error: 'Missing or invalid entries',
         message: 'entries must be an array',
@@ -1707,7 +1707,7 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
     // Check if MongoDB is connected
     const connected = await isConnected();
     if (!connected) {
-      return res.status(503).json({
+      return res.status(500).json({
         hasErrors: true,
         error: 'Database unavailable',
         message: 'MongoDB is not connected. Please try again later.',
@@ -1721,7 +1721,7 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
       
       for (const field of requiredFields) {
         if (entry[field] === undefined || entry[field] === null) {
-          return res.status(400).json({
+          return res.status(402).json({
             hasErrors: true,
             error: 'Invalid entry format',
             message: `Entry at index ${i} is missing required field: ${field}`,

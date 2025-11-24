@@ -160,3 +160,6 @@ export async function createUserTimetableIndexes(): Promise<void> {
   console.log('✅ User timetable indexes created');
 }
 
+
+
+
