@@ -6,15 +6,21 @@ import { Collection, Document } from 'mongodb';
  */
 export interface UserTimetableEntry {
   id: number;
-  day: number; // enum index: 0=Monday, 1=Tuesday, etc.
-  sh: number; // start hour
-  sm: number; // start minute
-  eh: number; // end hour
-  em: number; // end minute
-  subject: string;
+  day: string; // "monday", "tuesday", etc.
+  interval: {
+    start: {
+      hour: number;
+      minute: number;
+    };
+    end: {
+      hour: number;
+      minute: number;
+    };
+  };
+  subjectName: string;
   teacher: string;
-  freq: number; // frequency enum index: 0=weekly, 1=oddweeks, 2=evenweeks
-  type: number; // type enum index: 0=lecture, 1=seminar, 2=lab, 3=other
+  frequency: string; // "weekly", "oddweeks", "evenweeks"
+  type: string; // "lecture", "seminar", "lab", "other"
   room: string;
   format: string;
 }

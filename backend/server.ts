@@ -1714,10 +1714,12 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
       });
     }
 
-    // Validate each entry has the required structure
+    // Validate each entry has the required structure matching frontend format
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
-      const requiredFields = ['id', 'day', 'sh', 'sm', 'eh', 'em', 'subject', 'teacher', 'freq', 'type', 'room', 'format'];
+      
+      // Check top-level required fields
+      const requiredFields = ['id', 'day', 'interval', 'subjectName', 'teacher', 'frequency', 'type', 'room', 'format'];
       
       for (const field of requiredFields) {
         if (entry[field] === undefined || entry[field] === null) {
@@ -1727,6 +1729,33 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
             message: `Entry at index ${i} is missing required field: ${field}`,
           });
         }
+      }
+      
+      // Validate interval structure
+      if (!entry.interval.start || !entry.interval.end) {
+        return res.status(402).json({
+          hasErrors: true,
+          error: 'Invalid interval format',
+          message: `Entry at index ${i} has invalid interval structure. Expected interval.start and interval.end`,
+        });
+      }
+      
+      // Validate interval.start
+      if (typeof entry.interval.start.hour !== 'number' || typeof entry.interval.start.minute !== 'number') {
+        return res.status(402).json({
+          hasErrors: true,
+          error: 'Invalid interval.start format',
+          message: `Entry at index ${i} has invalid interval.start. Expected hour and minute as numbers`,
+        });
+      }
+      
+      // Validate interval.end
+      if (typeof entry.interval.end.hour !== 'number' || typeof entry.interval.end.minute !== 'number') {
+        return res.status(402).json({
+          hasErrors: true,
+          error: 'Invalid interval.end format',
+          message: `Entry at index ${i} has invalid interval.end. Expected hour and minute as numbers`,
+        });
       }
     }
 
