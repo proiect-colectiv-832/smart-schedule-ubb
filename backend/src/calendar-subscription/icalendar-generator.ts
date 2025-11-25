@@ -8,9 +8,9 @@ import { UserTimetable, UserEvent, RecurrenceRule } from './user-timetable-manag
 import {
   scrapeAcademicCalendar,
   getVacations,
-  getCurrentPeriod,
-  AcademicYearStructure,
-  AcademicPeriod
+  getFreeDays,
+  isNonTeachingDay,
+  AcademicYearStructure
 } from './academic-calendar-scraper';
 
 const TIMEZONE = 'Europe/Bucharest';
@@ -69,6 +69,7 @@ export async function generateICalendar(
   options?: {
     includeVacations?: boolean;
     includeExamPeriods?: boolean;
+    includeFreeDays?: boolean;
     language?: 'ro-en' | 'hu-de';
     isTerminalYear?: boolean;
   }
@@ -76,6 +77,7 @@ export async function generateICalendar(
   const opts = {
     includeVacations: true,
     includeExamPeriods: true,
+    includeFreeDays: true,
     language: 'ro-en' as 'ro-en' | 'hu-de',
     isTerminalYear: false,
     ...options
@@ -107,6 +109,11 @@ export async function generateICalendar(
     addVacationEvents(calendar, academicStructure);
   }
 
+  // Adăugăm zilele libere ca evenimente all-day
+  if (opts.includeFreeDays && academicStructure) {
+    addFreeDayEvents(calendar, academicStructure);
+  }
+
   // Adăugăm perioadele de examene
   if (opts.includeExamPeriods && academicStructure) {
     addExamPeriodEvents(calendar, academicStructure, opts.isTerminalYear);
@@ -132,6 +139,27 @@ function addVacationEvents(calendar: ICalCalendar, structure: AcademicYearStruct
       categories: [{ name: 'VACATION' }],
       // @ts-ignore
       color: '#4CAF50', // Verde pentru vacanțe
+    });
+  }
+}
+
+/**
+ * Add free day events to the calendar
+ */
+function addFreeDayEvents(calendar: ICalCalendar, structure: AcademicYearStructure): void {
+  const freeDays = getFreeDays(structure);
+
+  for (const freeDay of freeDays) {
+    calendar.createEvent({
+      id: `free-day-${freeDay.startDate.getTime()}`,
+      summary: `🎉 ${freeDay.description}`,
+      start: freeDay.startDate,
+      end: new Date(freeDay.endDate.getTime() + 24 * 60 * 60 * 1000), // +1 zi pentru all-day events
+      allDay: true,
+      description: freeDay.notes || 'Zi liberă',
+      categories: [{ name: 'FREE-DAY' }],
+      // @ts-ignore
+      color: '#FF6B6B', // Roșu pentru zile libere
     });
   }
 }
@@ -202,7 +230,7 @@ function addExamPeriodEvents(
 }
 
 /**
- * Verifică dacă un eveniment cade în vacanță și ar trebui exclus
+ * Verifică dacă un eveniment cade în vacanță sau zi liberă și ar trebui exclus
  */
 function shouldExcludeEvent(
   event: UserEvent,
@@ -214,13 +242,9 @@ function shouldExcludeEvent(
   if (!event.isRecurring) return false;
   if (event.type === 'custom') return false;
 
-  // Verificăm dacă evenimentul începe într-o vacanță
+  // Verificăm dacă evenimentul începe într-o vacanță sau zi liberă
   const eventDate = new Date(event.startTime);
-  const vacations = getVacations(structure);
-
-  return vacations.some(vacation =>
-    eventDate >= vacation.startDate && eventDate <= vacation.endDate
-  );
+  return isNonTeachingDay(eventDate, structure);
 }
 
 /**

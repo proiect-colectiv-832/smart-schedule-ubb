@@ -5,17 +5,16 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import ical, { ICalCalendar } from 'ical-generator';
+import ical from 'ical-generator';
 import { UserEvent, RecurrenceRule } from './user-timetable-manager';
 import {
   scrapeAcademicCalendar,
   getVacations,
-  isVacation,
-  AcademicYearStructure,
-  AcademicPeriod
+  getFreeDays,
+  isNonTeachingDay,
+  AcademicYearStructure
 } from './academic-calendar-scraper';
 import { UserTimetableEntry } from '../database/user-timetable-db';
-import { v4 as uuidv4 } from 'uuid';
 
 const TIMEZONE = 'Europe/Bucharest';
 const ICS_FILES_DIR = path.join(__dirname, '../../ics-files-for-users');
@@ -209,11 +208,11 @@ export function convertJSONTimetableToEvents(
 }
 
 /**
- * Check if a date falls during a vacation period
+ * Check if a date falls during a vacation period or free day
  */
 function isDateInVacation(date: Date, structure: AcademicYearStructure | null): boolean {
   if (!structure) return false;
-  return isVacation(date, structure);
+  return isNonTeachingDay(date, structure);
 }
 
 /**
@@ -280,11 +279,15 @@ export async function generateUserICSFile(
     semesterStart?: Date;
     semesterEnd?: Date;
     excludeVacations?: boolean;
+    includeFreeDaysAsEvents?: boolean;
+    includeVacationsAsEvents?: boolean;
   }
 ): Promise<string> {
   const opts = {
     language: 'ro-en' as 'ro-en' | 'hu-de',
     excludeVacations: true,
+    includeFreeDaysAsEvents: true,
+    includeVacationsAsEvents: false,
     ...options
   };
 
@@ -327,6 +330,36 @@ export async function generateUserICSFile(
         summary: event.title,
         description: event.description,
         location: event.location,
+        timezone: TIMEZONE,
+      });
+    }
+  }
+
+  // Add free days as all-day events
+  if (opts.includeFreeDaysAsEvents && academicStructure) {
+    const freeDays = getFreeDays(academicStructure);
+    for (const freeDay of freeDays) {
+      calendar.createEvent({
+        start: freeDay.startDate,
+        end: new Date(freeDay.endDate.getTime() + 24 * 60 * 60 * 1000), // +1 day for all-day events
+        summary: `🎉 ${freeDay.description}`,
+        description: freeDay.notes || 'Zi liberă',
+        allDay: true,
+        timezone: TIMEZONE,
+      });
+    }
+  }
+
+  // Add vacations as all-day events
+  if (opts.includeVacationsAsEvents && academicStructure) {
+    const vacations = getVacations(academicStructure);
+    for (const vacation of vacations) {
+      calendar.createEvent({
+        start: vacation.startDate,
+        end: new Date(vacation.endDate.getTime() + 24 * 60 * 60 * 1000), // +1 day for all-day events
+        summary: `🏖️ ${vacation.description}`,
+        description: vacation.notes || 'Vacanță universitară',
+        allDay: true,
         timezone: TIMEZONE,
       });
     }

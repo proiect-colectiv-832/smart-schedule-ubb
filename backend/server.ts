@@ -1778,6 +1778,8 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
       const icsFilePath = await generateUserICSFile(userId, entries as UserTimetableEntry[], {
         language: 'ro-en',
         excludeVacations: true,
+        includeFreeDaysAsEvents: true,
+        includeVacationsAsEvents: false,
       });
       console.log(`📅 Generated ICS file for user ${userId}: ${icsFilePath}`);
     } catch (icsError) {
@@ -2053,6 +2055,8 @@ app.post('/icsfilesforusers/:userId/regenerate', async (req: Request, res: Respo
     const icsFilePath = await generateUserICSFile(userId, timetable.entries, {
       language: 'ro-en',
       excludeVacations: true,
+      includeFreeDaysAsEvents: true,
+      includeVacationsAsEvents: false,
     });
 
     res.json({

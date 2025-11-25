@@ -5,7 +5,7 @@ import { AnyNode } from 'domhandler';
 export interface AcademicPeriod {
   startDate: Date;
   endDate: Date;
-  type: 'teaching' | 'vacation' | 'exams' | 'retakes' | 'practice' | 'preparation' | 'graduation';
+  type: 'teaching' | 'vacation' | 'exams' | 'retakes' | 'practice' | 'preparation' | 'graduation' | 'free-day';
   description: string;
   notes?: string;
 }
@@ -60,7 +60,14 @@ function parseDateRange(dateStr: string): { startDate: Date; endDate: Date } | n
 function determinePeriodType(description: string): AcademicPeriod['type'] {
   const lowerDesc = description.toLowerCase();
 
-  if (lowerDesc.includes('activitate didactică') || lowerDesc.includes('pregătirea anului')) {
+  // Verificăm mai întâi zilele libere (sărbători naționale)
+  if (lowerDesc.includes('zi liberă') ||
+      lowerDesc.includes('zi nelucrătoare') ||
+      lowerDesc.includes('sărbătoare') ||
+      lowerDesc.includes('free day') ||
+      lowerDesc.includes('holiday')) {
+    return 'free-day';
+  } else if (lowerDesc.includes('activitate didactică') || lowerDesc.includes('pregătirea anului')) {
     return 'teaching';
   } else if (lowerDesc.includes('vacanț')) {
     return 'vacation';
@@ -86,6 +93,69 @@ function extractAcademicYear($: cheerio.CheerioAPI): string {
   const title = $('h2.title').text();
   const match = title.match(/(\d{4})-(\d{4})/);
   return match ? `${match[1]}-${match[2]}` : 'Unknown';
+}
+
+/**
+ * Extrage zilele libere menționate în paranteze din descrierea unei perioade
+ * Ex: "7 săptămâni (luni, 01.12.2025, Ziua Marii Uniri - zi liberă)"
+ * Returnează un array de zile libere cu datele și descrierile lor
+ */
+function extractFreeDaysFromDescription(
+  description: string,
+  notes: string | undefined,
+  periodStartDate: Date,
+  periodEndDate: Date
+): AcademicPeriod[] {
+  const freeDays: AcademicPeriod[] = [];
+
+  // Combinăm description și notes pentru a căuta zile libere
+  const fullText = `${description} ${notes || ''}`;
+
+  // Verificăm dacă textul conține "zi liberă" sau "zile libere"
+  if (!/[–\-]\s*zil?e?\s+liber[ăe]/i.test(fullText)) {
+    return freeDays;
+  }
+
+  // Găsim partea cu zilele libere (după paranteza deschisă, până la paranteza închisă sau end)
+  const freeDaysMatch = fullText.match(/\(([^)]+[–\-]\s*zil?e?\s+liber[ăe])/i);
+  if (!freeDaysMatch) {
+    return freeDays;
+  }
+
+  const freeDaysText = freeDaysMatch[1];
+
+  // Pattern pentru a găsi fiecare zi liberă: dată + descriere
+  // Ex: "luni, 01.12.2025, Ziua Marii Uniri"
+  const dayPattern = /(luni|marți|miercuri|joi|vineri|sâmbătă|duminică),?\s+(\d{2}\.\d{2}\.\d{4}),\s+([^,]+?)(?=\s+(?:și|–|\-|$))/gi;
+
+  let match;
+  while ((match = dayPattern.exec(freeDaysText)) !== null) {
+    const dateStr = match[2];
+    let freeDayDescription = match[3].trim();
+
+    // Parsăm data
+    const dateParts = dateStr.split('.');
+    if (dateParts.length === 3 && freeDayDescription && freeDayDescription.length > 2) {
+      const day = parseInt(dateParts[0]);
+      const month = parseInt(dateParts[1]) - 1; // lunile sunt 0-indexed
+      const year = parseInt(dateParts[2]);
+
+      const freeDayDate = new Date(year, month, day);
+
+      // Verificăm că data este în intervalul perioadei
+      if (freeDayDate >= periodStartDate && freeDayDate <= periodEndDate) {
+        freeDays.push({
+          startDate: freeDayDate,
+          endDate: freeDayDate,
+          type: 'free-day',
+          description: freeDayDescription,
+          notes: 'Zi liberă națională'
+        });
+      }
+    }
+  }
+
+  return freeDays;
 }
 
 /**
@@ -148,6 +218,19 @@ function parseTable($: cheerio.CheerioAPI, table: AnyNode): SemesterStructure[] 
           };
 
           currentSemester.periods.push(period);
+
+          // Extragem zilele libere din descriere (menționate în paranteze)
+          const freeDays = extractFreeDaysFromDescription(
+            description,
+            notes,
+            dateRange.startDate,
+            dateRange.endDate
+          );
+
+          // Adăugăm zilele libere ca perioade separate
+          for (const freeDay of freeDays) {
+            currentSemester.periods.push(freeDay);
+          }
         }
       }
     }
@@ -233,6 +316,23 @@ export function getVacations(structure: AcademicYearStructure): AcademicPeriod[]
 }
 
 /**
+ * Obține toate zilele libere dintr-o structură academică
+ */
+export function getFreeDays(structure: AcademicYearStructure): AcademicPeriod[] {
+  const freeDays: AcademicPeriod[] = [];
+
+  for (const semester of structure.semesters) {
+    for (const period of semester.periods) {
+      if (period.type === 'free-day') {
+        freeDays.push(period);
+      }
+    }
+  }
+
+  return freeDays;
+}
+
+/**
  * Verifică dacă o dată este într-o perioadă de vacanță
  */
 export function isVacation(date: Date, structure: AcademicYearStructure): boolean {
@@ -241,6 +341,29 @@ export function isVacation(date: Date, structure: AcademicYearStructure): boolea
   return vacations.some(vacation =>
     date >= vacation.startDate && date <= vacation.endDate
   );
+}
+
+/**
+ * Verifică dacă o dată este zi liberă
+ */
+export function isFreeDay(date: Date, structure: AcademicYearStructure): boolean {
+  const freeDays = getFreeDays(structure);
+
+  // Pentru comparație, normalizăm data la miezul nopții
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  return freeDays.some(freeDay => {
+    const freeDayStart = new Date(freeDay.startDate.getFullYear(), freeDay.startDate.getMonth(), freeDay.startDate.getDate());
+    const freeDayEnd = new Date(freeDay.endDate.getFullYear(), freeDay.endDate.getMonth(), freeDay.endDate.getDate());
+    return dateOnly >= freeDayStart && dateOnly <= freeDayEnd;
+  });
+}
+
+/**
+ * Verifică dacă o dată este vacanță SAU zi liberă (nu se țin cursuri)
+ */
+export function isNonTeachingDay(date: Date, structure: AcademicYearStructure): boolean {
+  return isVacation(date, structure) || isFreeDay(date, structure);
 }
 
 /**
