@@ -29,6 +29,10 @@ cache/
 # Data files (temporary/test)
 data/
 
+# ICS files generated for users
+ics-files-for-users/
+*.ics
+
 # OS
 .DS_Store
 .DS_Store?

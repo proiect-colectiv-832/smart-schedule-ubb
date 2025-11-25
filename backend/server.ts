@@ -76,6 +76,14 @@ import {
   createUserTimetableIndexes,
   UserTimetableEntry
 } from './src/database/user-timetable-db';
+import {
+  initializeICSDirectory,
+  generateUserICSFile,
+  getUserICSFilePath,
+  userICSFileExists,
+  deleteUserICSFile,
+  getAllICSFiles
+} from './src/calendar-subscription/user-ics-generator';
 
 const app = express();
 const server = http.createServer(app);
@@ -221,10 +229,13 @@ app.get('/', (req: Request, res: Response) => {
       'POST /timetable/event': 'Add or update user event',
       'DELETE /timetable/event': 'Delete user event',
       'GET /timetable/stats': 'Get user timetable statistics',
-      'POST /user-timetable': 'Save/update user timetable (mobile app)',
+      'POST /user-timetable': 'Save/update user timetable (mobile app) - Generates ICS file',
       'GET /user-timetable': 'Get user timetable from MongoDB (mobile app)',
-      'DELETE /user-timetable': 'Delete user timetable from MongoDB (mobile app)',
+      'DELETE /user-timetable': 'Delete user timetable from MongoDB (mobile app) - Deletes ICS file',
       'GET /user-timetable/stats': 'Get user timetable statistics from MongoDB',
+      'GET /icsfilesforusers': 'List all ICS files',
+      'GET /icsfilesforusers/:userId.ics': 'Download ICS file for specific user',
+      'POST /icsfilesforusers/:userId/regenerate': 'Regenerate ICS file for specific user',
       'GET /icalendar/generate': 'Generate iCalendar file',
       'GET /icalendar/validate': 'Validate iCalendar file',
       'GET /icalendar/metadata': 'Get metadata from iCalendar file',
@@ -1759,8 +1770,20 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
       }
     }
 
-    // Save the timetable
+    // Save the timetable to MongoDB
     const savedTimetable = await saveUserTimetableDB(userId, entries as UserTimetableEntry[]);
+
+    // Generate ICS file for the user
+    try {
+      const icsFilePath = await generateUserICSFile(userId, entries as UserTimetableEntry[], {
+        language: 'ro-en',
+        excludeVacations: true,
+      });
+      console.log(`📅 Generated ICS file for user ${userId}: ${icsFilePath}`);
+    } catch (icsError) {
+      console.error(`Warning: Failed to generate ICS file for user ${userId}:`, icsError);
+      // Don't fail the request if ICS generation fails
+    }
 
     res.status(200).json({
       hasErrors: false,
@@ -1770,6 +1793,7 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
         userId: savedTimetable.userId,
         entriesCount: savedTimetable.entries.length,
         updatedAt: savedTimetable.updatedAt,
+        icsFileUrl: `/icsfilesforusers/${userId}.ics`,
       },
     });
 
@@ -1872,6 +1896,13 @@ app.delete('/user-timetable', async (req: Request, res: Response) => {
       });
     }
 
+    // Also delete the ICS file if it exists
+    try {
+      await deleteUserICSFile(userId);
+    } catch (icsError) {
+      console.error(`Warning: Failed to delete ICS file for user ${userId}:`, icsError);
+    }
+
     res.json({
       hasErrors: false,
       success: true,
@@ -1913,6 +1944,134 @@ app.get('/user-timetable/stats', async (req: Request, res: Response) => {
       hasErrors: true,
       success: false,
       error: 'Failed to get user timetable statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== ICS FILES FOR USERS ENDPOINTS ==============
+
+// Get ICS file for a specific user
+app.get('/icsfilesforusers/:userId.ics', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).send('Missing userId parameter');
+    }
+
+    // Check if ICS file exists
+    const exists = await userICSFileExists(userId);
+    if (!exists) {
+      return res.status(404).send('ICS file not found for this user. Please save a timetable first.');
+    }
+
+    // Get file path
+    const filePath = getUserICSFilePath(userId);
+
+    // Set proper headers for ICS file
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${userId}.ics"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    // Send file
+    res.sendFile(filePath);
+
+    console.log(`📅 Served ICS file for user ${userId}`);
+  } catch (error: any) {
+    console.error('Error serving ICS file:', error);
+    res.status(500).send('Error serving ICS file. Please try again later.');
+  }
+});
+
+// Get list of all ICS files (for debugging/admin)
+app.get('/icsfilesforusers', async (req: Request, res: Response) => {
+  try {
+    const files = await getAllICSFiles();
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      data: {
+        totalFiles: files.length,
+        files: files.map(f => ({
+          filename: f,
+          userId: f.replace('.ics', ''),
+          url: `/icsfilesforusers/${f}`
+        }))
+      }
+    });
+
+    console.log(`📋 Listed ${files.length} ICS files`);
+  } catch (error: any) {
+    console.error('Error listing ICS files:', error);
+    res.status(500).json({
+      hasErrors: true,
+      error: 'Failed to list ICS files',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Regenerate ICS file for a specific user (useful for manual refresh)
+app.post('/icsfilesforusers/:userId/regenerate', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    // Get user timetable from MongoDB
+    const timetable = await getUserTimetableDB(userId);
+
+    if (!timetable) {
+      return res.status(404).json({
+        hasErrors: true,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    // Regenerate ICS file
+    const icsFilePath = await generateUserICSFile(userId, timetable.entries, {
+      language: 'ro-en',
+      excludeVacations: true,
+    });
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      message: 'ICS file regenerated successfully',
+      data: {
+        userId,
+        icsFileUrl: `/icsfilesforusers/${userId}.ics`,
+        filePath: icsFilePath,
+      }
+    });
+
+    console.log(`♻️  Regenerated ICS file for user ${userId}`);
+  } catch (error: any) {
+    console.error('Error regenerating ICS file:', error);
+    res.status(500).json({
+      hasErrors: true,
+      error: 'Failed to regenerate ICS file',
       message: error.message || 'Unknown error occurred',
     });
   }
@@ -2267,6 +2426,15 @@ async function startServer() {
     console.log('📅 User timetable manager initialized');
   } catch (error) {
     console.error('⚠️  Warning: Failed to initialize user timetable manager');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
+  // Initialize ICS files directory
+  try {
+    await initializeICSDirectory();
+    console.log('📁 ICS files directory initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize ICS files directory');
     console.error('   Error:', error instanceof Error ? error.message : error);
   }
 
