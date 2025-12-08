@@ -289,16 +289,16 @@ function addEventToCalendar(
       isTerminalYear
     );
     if (rrule) {
-      eventData.repeating = rrule;
-
       // Adăugăm EXDATE pentru vacanțe (exclude specific dates)
       if (academicStructure) {
         const excludeDates = getVacationExcludeDates(event, academicStructure);
         if (excludeDates.length > 0) {
-          // @ts-ignore
-          eventData.exclusionDates = excludeDates;
+          // Adăugăm exclude direct în rrule (conform ical-generator API)
+          rrule.exclude = excludeDates;
+          rrule.excludeTimezone = TIMEZONE;
         }
       }
+      eventData.repeating = rrule;
     }
   }
 

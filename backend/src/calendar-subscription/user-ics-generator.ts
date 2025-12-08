@@ -157,7 +157,9 @@ function getDefaultSemesterDates(): { start: Date; end: Date } {
     const oct1 = new Date(month >= 9 ? year : year - 1, 9, 1);
     // Get the Monday of the week containing October 1st
     start = getMondayOfWeek(oct1);
-    end = new Date(month >= 9 ? year + 1 : year, 0, 31); // January 31
+    // End date will be determined by academic structure, 
+    // but we set a default to mid-January (before exams typically start)
+    end = new Date(month >= 9 ? year + 1 : year, 0, 18); // January 18 (typical end of teaching)
   }
   // Spring semester (February - June)
   else {
@@ -165,10 +167,47 @@ function getDefaultSemesterDates(): { start: Date; end: Date } {
     const feb1 = new Date(year, 1, 1);
     // Get the Monday of the week containing February 1st
     start = getMondayOfWeek(feb1);
-    end = new Date(year, 5, 30); // June 30
+    end = new Date(year, 4, 31); // May 31 (typical end of teaching before June exams)
   }
 
   return { start, end };
+}
+
+/**
+ * Determine the end of teaching period from academic structure
+ */
+async function getTeachingEndDate(
+  semesterStartHint: Date,
+  language: 'ro-en' | 'hu-de' = 'ro-en'
+): Promise<Date | null> {
+  try {
+    const structure = await getAcademicStructure(language);
+    if (!structure) return null;
+
+    // Determine which semester we're in based on the start date
+    const startMonth = semesterStartHint.getMonth();
+    const isFallSemester = startMonth >= 8 || startMonth <= 1; // September-February = Fall/Semester I
+
+    for (const semester of structure.semesters) {
+      // Match semester I for fall, semester II for spring
+      if (isFallSemester && semester.semester !== 'I') continue;
+      if (!isFallSemester && semester.semester !== 'II') continue;
+
+      // Find the last teaching period
+      for (let i = semester.periods.length - 1; i >= 0; i--) {
+        const period = semester.periods[i];
+        if (period.type === 'teaching') {
+          console.log(`📅 Found teaching end date: ${period.endDate.toLocaleDateString('ro-RO')} for ${semester.semester}`);
+          return period.endDate;
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting teaching end date:', error);
+    return null;
+  }
 }
 
 /**
@@ -315,11 +354,24 @@ export async function generateUserICSFile(
     ...options
   };
 
+  // Get default semester dates
+  const { start: defaultStart, end: defaultEnd } = getDefaultSemesterDates();
+  const semesterStart = opts.semesterStart || defaultStart;
+  
+  // Determine correct semester end date from academic structure
+  // This is crucial to avoid generating events during exam period
+  let semesterEnd = opts.semesterEnd;
+  if (!semesterEnd) {
+    const teachingEndDate = await getTeachingEndDate(semesterStart, opts.language);
+    semesterEnd = teachingEndDate || defaultEnd;
+    console.log(`📅 Using teaching end date: ${semesterEnd.toLocaleDateString('ro-RO')}`);
+  }
+
   // Convert JSON timetable to events
   const events = convertJSONTimetableToEvents(
     entries,
-    opts.semesterStart,
-    opts.semesterEnd
+    semesterStart,
+    semesterEnd
   );
 
   // Get academic structure

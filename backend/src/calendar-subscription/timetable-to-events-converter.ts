@@ -227,6 +227,10 @@ function getMondayOfWeek(date: Date): Date {
  * UBB semesters start on the Monday of the week containing:
  * - October 1st for fall semester
  * - February 1st for spring semester
+ * 
+ * Note: The end date is set to a conservative estimate (mid-January / end of May)
+ * to avoid generating events during exam periods. For accurate dates,
+ * the academic calendar structure should be consulted.
  */
 export function getDefaultSemesterDates(): { start: Date; end: Date } {
   const now = new Date();
@@ -242,7 +246,9 @@ export function getDefaultSemesterDates(): { start: Date; end: Date } {
     const oct1 = new Date(month >= 9 ? year : year - 1, 9, 1);
     // Get the Monday of the week containing October 1st
     start = getMondayOfWeek(oct1);
-    end = new Date(month >= 9 ? year + 1 : year, 0, 31); // January 31
+    // End date: January 18 (typical last day of teaching before exams)
+    // The exact date should come from academic calendar structure
+    end = new Date(month >= 9 ? year + 1 : year, 0, 18);
   }
   // Spring semester (February - June)
   else {
@@ -250,7 +256,9 @@ export function getDefaultSemesterDates(): { start: Date; end: Date } {
     const feb1 = new Date(year, 1, 1);
     // Get the Monday of the week containing February 1st
     start = getMondayOfWeek(feb1);
-    end = new Date(year, 5, 30); // June 30
+    // End date: May 31 (typical last day of teaching before June exams)
+    // The exact date should come from academic calendar structure
+    end = new Date(year, 4, 31);
   }
 
   return { start, end };
