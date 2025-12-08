@@ -123,7 +123,25 @@ function getNextDayOfWeek(fromDate: Date, dayOfWeek: number): Date {
 }
 
 /**
+ * Get the Monday of the week containing a given date
+ * This is important because UBB semesters start on the Monday of the week
+ * containing October 1st (fall) or February 1st (spring)
+ */
+function getMondayOfWeek(date: Date): Date {
+  const result = new Date(date);
+  const dayOfWeek = result.getDay();
+  // getDay() returns 0 for Sunday, 1 for Monday, etc.
+  // We need to go back to Monday (if Sunday, go back 6 days; if Monday, stay; if Tuesday, go back 1 day, etc.)
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  result.setDate(result.getDate() - daysToSubtract);
+  return result;
+}
+
+/**
  * Get default semester dates based on current date
+ * UBB semesters start on the Monday of the week containing:
+ * - October 1st for fall semester
+ * - February 1st for spring semester
  */
 function getDefaultSemesterDates(): { start: Date; end: Date } {
   const now = new Date();
@@ -135,12 +153,18 @@ function getDefaultSemesterDates(): { start: Date; end: Date } {
 
   // Fall semester (October - January)
   if (month >= 9 || month <= 0) {
-    start = new Date(month >= 9 ? year : year - 1, 9, 1); // October 1
+    // Get October 1st of the appropriate year
+    const oct1 = new Date(month >= 9 ? year : year - 1, 9, 1);
+    // Get the Monday of the week containing October 1st
+    start = getMondayOfWeek(oct1);
     end = new Date(month >= 9 ? year + 1 : year, 0, 31); // January 31
   }
   // Spring semester (February - June)
   else {
-    start = new Date(year, 1, 1); // February 1
+    // Get February 1st
+    const feb1 = new Date(year, 1, 1);
+    // Get the Monday of the week containing February 1st
+    start = getMondayOfWeek(feb1);
     end = new Date(year, 5, 30); // June 30
   }
 
