@@ -4,8 +4,8 @@
   "description": "UBB Timetable Parser API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node server.ts",
-    "build": "tsc",
+    "dev": "ts-node --respawn --transpile-only server.ts",
+    "build": "tsc -p tsconfig.json",
     "postinstall": "npm run build",
     "start": "node dist/server.js",
     "test": "jest",
@@ -30,7 +30,15 @@
     "socket.io": "^4.8.1",
     "typescript": "^5.3.3",
     "uuid": "^9.0.1",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "@opentelemetry/api": "latest",
+    "@opentelemetry/sdk-node": "latest",
+    "@opentelemetry/auto-instrumentations-node": "latest",
+    "@opentelemetry/resources": "latest",
+    "@opentelemetry/semantic-conventions": "latest",
+    "@opentelemetry/exporter-trace-otlp-http": "latest",
+    "@opentelemetry/exporter-metrics-otlp-http": "latest",
+    "@opentelemetry/sdk-metrics": "latest"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

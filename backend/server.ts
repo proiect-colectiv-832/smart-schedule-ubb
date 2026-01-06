@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './src/telemetry';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as http from 'http';
