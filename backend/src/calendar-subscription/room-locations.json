@@ -1,0 +1,322 @@
+{
+  "rooms": {
+    "2/I": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "5/I": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "6/II": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "7/I": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "9/I": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "AAM": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "AVM": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-125": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-Blaga": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-Bogrea": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-Goanga": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-Pompiliu": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-Rosca": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Ist-Vatasianu": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "MOS-S15": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "MOS-S16": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "242": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "243B": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Fizica-215": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Fizica-233": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "Fizica-5/2": {
+      "address": "Strada Mihail Kogălniceanu, 1, Cluj-Napoca, 400084, Cluj, România"
+    },
+    "C310": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "C335": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "C510": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "C512": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L001": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L002": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L320": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L321": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L336": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L338": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L402": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L404": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "L439": {
+      "address": "Strada Teodor Mihali, nr. 58, Cluj, 400591, România"
+    },
+    "CR0001": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR201": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR202": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR203": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR204": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR205": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR301": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR302": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR401": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR402": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR403": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR405": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "CR406": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "T301": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "T302": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "T303": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "T304": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "T305": {
+      "address": "Acces Lombului-Valea Chintăului, Cluj, 400647, România"
+    },
+    "e": {
+      "address": "Strada Ploiești, nr. 22, Cluj, 400157, România"
+    },
+    "gamma": {
+      "address": "Strada Ploiești, nr. 22, Cluj, 400157, România"
+    },
+    "lambda": {
+      "address": "Strada Ploiești, nr. 22, Cluj, 400157, România"
+    },
+    "Multimedia": {
+      "address": "Strada Ploiești, nr. 22, Cluj, 400157, România"
+    },
+    "phi": {
+      "address": "Strada Ploiești, nr. 22, Cluj, 400157, România"
+    },
+    "pi": {
+      "address": "Strada Ploiești, nr. 22, Cluj, 400157, România"
+    },
+    "Obs": {
+      "address": "Strada Cireșilor, 19, Cluj-Napoca, 400487, Cluj, România"
+    },
+    "Drept_Ionascu": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_103": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_104": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_108": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_203": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_204": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_205": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_208": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_Iancu": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "Drept_Sandor": {
+      "address": "Strada General Traian Moșoiu, nr. 10-12, Cluj, 400132, România"
+    },
+    "NTTSocrate": {
+      "address": "Strada Constanța, nr. 19-21, Cluj, 400158, România"
+    },
+    "Platon": {
+      "address": "Strada Constanța, nr. 19-21, Cluj, 400158, România"
+    },
+    "Saturn": {
+      "address": "Strada Constanța, nr. 19-21, Cluj, 400158, România"
+    },
+    "Chimie204": {
+      "address": "Strada Arany János, 11, Cluj-Napoca, 400028, Cluj, România"
+    },
+    "Chimie88": {
+      "address": "Strada Arany János, 11, Cluj-Napoca, 400028, Cluj, România"
+    },
+    "Sala-MHP": {
+      "address": "Strada Onisifor Ghibu, nr. 18, Cluj, 400185, România"
+    },
+    "DPPD-204": {
+      "address": "Calea Moților, nr. 7, Cluj, 400001, România"
+    },
+    "DPPD-205": {
+      "address": "Calea Moților, nr. 7, Cluj, 400001, România"
+    },
+    "DPPD-A307": {
+      "address": "Calea Moților, nr. 7, Cluj, 400001, România"
+    },
+    "KuTi": {
+      "address": "Strada Sindicatelor, nr. 7, Cluj, 400029, România"
+    },
+    "Lit-302": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "Lit-Balzac": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "Lit-Cosbuc": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "Lit-L5": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "Lit-Puskin": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "Lit-S13": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "Lit-Shakespeare": {
+      "address": "Strada Horea, nr. 31, Cluj, 400202, România"
+    },
+    "A310": {
+      "address": "Strada Avram Iancu, nr. 11, Cluj, 400083, România"
+    },
+    "A311": {
+      "address": "Strada Avram Iancu, nr. 11, Cluj, 400083, România"
+    },
+    "A312": {
+      "address": "Strada Avram Iancu, nr. 11, Cluj, 400083, România"
+    },
+    "A313": {
+      "address": "Strada Avram Iancu, nr. 11, Cluj, 400083, România"
+    },
+    "A314": {
+      "address": "Strada Avram Iancu, nr. 11, Cluj, 400083, România"
+    },
+    "Virtual": {
+      "address": ""
+    },
+    "Catedra": {
+      "address": ""
+    },
+    "Cdspr1": {
+      "address": "Strada Constantin Brâncuși, nr. 69, Cluj, 400458, România"
+    },
+    "Cdspr2": {
+      "address": "Strada Constantin Brâncuși, nr. 69, Cluj, 400458, România"
+    },
+    "neprecizat": {
+      "address": ""
+    },
+    "Teatru": {
+      "address": "Strada Burebista, nr. 2, Cluj, 400276, România"
+    },
+    "StEur-JMonnet": {
+      "address": "Strada Emmanuel de Martonne, Cluj, 400079, România"
+    },
+    "StEur-Ferdinand": {
+      "address": "Strada Ion C. Brătianu, nr. 22, Cluj, 400080, România"
+    },
+    "StEur-103": {
+      "address": "Strada Avram Iancu, nr. 19, Cluj, 400083, România"
+    },
+    "StEur-104": {
+      "address": "Strada Avram Iancu, nr. 19, Cluj, 400083, România"
+    },
+    "StEur-105": {
+      "address": "Strada Avram Iancu, nr. 19, Cluj, 400083, România"
+    },
+    "StEur-Margineanu": {
+      "address": "Strada Avram Iancu, nr. 19, Cluj, 400083, România"
+    },
+    "Online": {
+      "address": ""
+    }
+  },
+  "metadata": {
+    "lastUpdated": "2026-01-08",
+    "version": "2.0.0",
+    "notes": "Adresele complete pentru toate sălile UBB Cluj-Napoca. Coordonatele nu sunt necesare - adresele sunt compatibile cu Google Maps și Apple Maps."
+  }
+}
+

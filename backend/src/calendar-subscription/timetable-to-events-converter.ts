@@ -6,6 +6,7 @@
 import { TimetableEntry } from '../types';
 import { UserEvent, RecurrenceRule } from './user-timetable-manager';
 import { v4 as uuidv4 } from 'uuid';
+import { formatRoomInfoForDescription, formatRoomLocationForCalendar } from './room-location-service';
 
 /**
  * Convert timetable entries to user events
@@ -14,15 +15,15 @@ import { v4 as uuidv4 } from 'uuid';
  * @param semesterEnd - End date of the semester (optional)
  * @returns Array of user events
  */
-export function convertTimetableEntriesToEvents(
+export async function convertTimetableEntriesToEvents(
   entries: TimetableEntry[],
   semesterStart: Date,
   semesterEnd?: Date
-): UserEvent[] {
+): Promise<UserEvent[]> {
   const events: UserEvent[] = [];
 
   for (const entry of entries) {
-    const event = convertSingleEntry(entry, semesterStart, semesterEnd);
+    const event = await convertSingleEntry(entry, semesterStart, semesterEnd);
     if (event) {
       events.push(event);
     }
@@ -34,11 +35,11 @@ export function convertTimetableEntriesToEvents(
 /**
  * Convert a single timetable entry to a user event
  */
-function convertSingleEntry(
+async function convertSingleEntry(
   entry: TimetableEntry,
   semesterStart: Date,
   semesterEnd?: Date
-): UserEvent | null {
+): Promise<UserEvent | null> {
   try {
     // Parse day of week
     const dayOfWeek = parseDayOfWeek(entry.day);
@@ -67,14 +68,22 @@ function convertSingleEntry(
     // Determine event type
     const type = parseEventType(entry.type);
 
+    // Get room location information
+    let roomInfo = '';
+    let locationAddress = '';
+    if (entry.room) {
+      roomInfo = await formatRoomInfoForDescription(entry.room);
+      locationAddress = await formatRoomLocationForCalendar(entry.room);
+    }
+
     // Build event
     const event: UserEvent = {
       id: uuidv4(),
       title: `${entry.subject} (${entry.type})`,
       startTime,
       endTime,
-      location: entry.room || undefined,
-      description: `Teacher: ${entry.teacher}\nGroup: ${entry.group}\nType: ${entry.type}`,
+      location: locationAddress || undefined,
+      description: `Teacher: ${entry.teacher}\nGroup: ${entry.group}\nType: ${entry.type}${roomInfo ? `\n${roomInfo}` : ''}`,
       isRecurring: true,
       recurrenceRule,
       type,

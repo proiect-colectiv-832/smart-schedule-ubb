@@ -15,6 +15,7 @@ import {
   AcademicYearStructure
 } from './academic-calendar-scraper';
 import { UserTimetableEntry } from '../database/user-timetable-db';
+import { formatRoomInfoForDescription, formatRoomLocationForCalendar } from './room-location-service';
 
 const TIMEZONE = 'Europe/Bucharest';
 const ICS_FILES_DIR = path.join(__dirname, '../../ics-files-for-users');
@@ -213,11 +214,11 @@ async function getTeachingEndDate(
 /**
  * Convert UserTimetableEntry (from frontend JSON) to UserEvent
  */
-export function convertJSONTimetableToEvents(
+export async function convertJSONTimetableToEvents(
   entries: UserTimetableEntry[],
   semesterStart?: Date,
   semesterEnd?: Date
-): UserEvent[] {
+): Promise<UserEvent[]> {
   const { start: defaultStart, end: defaultEnd } = getDefaultSemesterDates();
   const start = semesterStart || defaultStart;
   const end = semesterEnd || defaultEnd;
@@ -248,14 +249,22 @@ export function convertJSONTimetableToEvents(
       // Parse event type
       const type = parseEventType(entry.type);
 
+      // Get room location information
+      let roomInfo = '';
+      let locationAddress = '';
+      if (entry.room) {
+        roomInfo = await formatRoomInfoForDescription(entry.room);
+        locationAddress = await formatRoomLocationForCalendar(entry.room);
+      }
+
       // Create event
       const event: UserEvent = {
         id: entry.id.toString(),
         title: `${entry.subjectName} (${entry.type})`,
         startTime,
         endTime,
-        location: entry.room || undefined,
-        description: `Teacher: ${entry.teacher}\nFormat: ${entry.format}\nType: ${entry.type}`,
+        location: locationAddress || undefined,
+        description: `Teacher: ${entry.teacher}\nFormat: ${entry.format}\nType: ${entry.type}${roomInfo ? `\n${roomInfo}` : ''}`,
         isRecurring: true,
         recurrenceRule,
         type,
@@ -368,7 +377,7 @@ export async function generateUserICSFile(
   }
 
   // Convert JSON timetable to events
-  const events = convertJSONTimetableToEvents(
+  const events = await convertJSONTimetableToEvents(
     entries,
     semesterStart,
     semesterEnd
