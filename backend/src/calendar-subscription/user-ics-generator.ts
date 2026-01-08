@@ -20,6 +20,30 @@ import { formatRoomInfoForDescription, formatRoomLocationForCalendar } from './r
 const TIMEZONE = 'Europe/Bucharest';
 const ICS_FILES_DIR = path.join(__dirname, '../../ics-files-for-users');
 
+/**
+ * Generate VTIMEZONE component for Europe/Bucharest
+ * Required for valid iCalendar files when using TZID
+ */
+function getVTimezoneComponent(): string {
+  return `BEGIN:VTIMEZONE
+TZID:Europe/Bucharest
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0300
+TZNAME:EEST
+DTSTART:19700329T030000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0300
+TZOFFSETTO:+0200
+TZNAME:EET
+DTSTART:19701025T040000
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+END:VTIMEZONE`;
+}
+
 // Cache for academic structure
 let cachedAcademicStructure: AcademicYearStructure | null = null;
 let cacheTimestamp: Date | null = null;
@@ -386,11 +410,14 @@ export async function generateUserICSFile(
   // Get academic structure
   const academicStructure = await getAcademicStructure(opts.language);
 
-  // Create calendar
+  // Create calendar with VTIMEZONE component
   const calendar = ical({
     name: 'UBB Smart Schedule',
     description: `Personalized timetable for user ${userId}`,
-    timezone: TIMEZONE,
+    timezone: {
+      name: TIMEZONE,
+      generator: getVTimezoneComponent
+    },
     ttl: 3600,
     prodId: {
       company: 'UBB Cluj-Napoca',

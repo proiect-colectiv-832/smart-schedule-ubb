@@ -34,10 +34,10 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
     const filePath = path.join(__dirname, 'room-locations.json');
     const fileContent = await fs.readFile(filePath, 'utf-8');
     roomLocationsCache = JSON.parse(fileContent);
-    console.log('📍 Room locations loaded successfully');
+    console.log(`📍 Room locations loaded: ${Object.keys(roomLocationsCache?.rooms || {}).length} rooms`);
     return roomLocationsCache!;
   } catch (error) {
-    console.error('Error loading room locations:', error);
+    console.error('❌ Error loading room locations:', error);
     // Return empty structure as fallback
     return {
       rooms: {},
@@ -70,6 +70,7 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
     return data.rooms[matchingKey];
   }
 
+  // Room not found - this is not necessarily an error (could be intentional)
   return null;
 }
 
@@ -79,6 +80,7 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
  */
 export async function formatRoomLocationForCalendar(roomCode: string): Promise<string> {
   const location = await getRoomLocation(roomCode);
+
 
   if (!location || !location.address) {
     return ''; // Empty if room not found or no address

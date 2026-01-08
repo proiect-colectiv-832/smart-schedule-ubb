@@ -2299,6 +2299,7 @@ app.get('/timetable/events/default-dates', async (req: Request, res: Response) =
 
 // === END CALENDAR ENDPOINTS ===
 
+
 // Create hash for a timetable
 app.post('/hash', async (req: Request, res: Response) => {
   try {
