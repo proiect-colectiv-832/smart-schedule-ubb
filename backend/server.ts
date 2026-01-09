@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as http from 'http';
+import cron from 'node-cron';
 import {
   parseTimetable,
   parseTimetablesByGroup,
@@ -84,6 +85,12 @@ import {
   deleteUserICSFile,
   getAllICSFiles
 } from './src/calendar-subscription/user-ics-generator';
+import {
+  compareTimetablesForAllUsers,
+  initializeTimetableComparison,
+  checkUserTimetableChanges,
+  getTimetableComparisonStats
+} from './src/jobs/timetable-comparison-job';
 
 const app = express();
 const server = http.createServer(app);
@@ -1059,6 +1066,77 @@ app.post('/notifications/schedule-change', async (req: Request, res: Response) =
     res.status(500).json({
       success: false,
       error: 'Failed to create schedule change notification',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// === TIMETABLE COMPARISON ENDPOINTS ===
+
+// Check for timetable changes for a specific user (called when user opens app)
+app.get('/timetable/check-changes', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId query parameter is required',
+      });
+    }
+
+    const result = await checkUserTimetableChanges(userId as string);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Error checking timetable changes:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check timetable changes',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get timetable comparison statistics
+app.get('/timetable/comparison-stats', async (req: Request, res: Response) => {
+  try {
+    const stats = getTimetableComparisonStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error: any) {
+    console.error('Error getting comparison stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get comparison stats',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Manually trigger timetable comparison (for testing/admin)
+app.post('/timetable/run-comparison', async (req: Request, res: Response) => {
+  try {
+    console.log('📢 Manual timetable comparison triggered');
+    const result = await compareTimetablesForAllUsers();
+
+    res.json({
+      success: true,
+      message: 'Timetable comparison completed',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Error running timetable comparison:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to run timetable comparison',
       message: error.message || 'Unknown error occurred',
     });
   }
@@ -2446,6 +2524,29 @@ async function startServer() {
   // Initialize push notification manager
   pushManager = new PushNotificationManager(server);
   console.log('📱 Push notification manager initialized');
+
+  // Initialize timetable comparison baseline (for change detection)
+  try {
+    await initializeTimetableComparison();
+    console.log('🔄 Timetable comparison initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize timetable comparison');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
+  // Set up daily cron job for timetable comparison (runs at 6:00 AM every day)
+  cron.schedule('0 6 * * *', async () => {
+    console.log('⏰ Running scheduled timetable comparison...');
+    try {
+      const result = await compareTimetablesForAllUsers();
+      console.log(`📊 Scheduled comparison result: ${result.usersWithChanges}/${result.usersChecked} users had changes`);
+    } catch (error) {
+      console.error('Error during scheduled timetable comparison:', error);
+    }
+  }, {
+    timezone: 'Europe/Bucharest' // Romanian timezone
+  });
+  console.log('⏰ Daily timetable comparison scheduled for 6:00 AM');
 
   server.listen(PORT, () => {
     console.log('='.repeat(60));
