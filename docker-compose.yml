@@ -1,5 +1,5 @@
 ---
-# File: docker-compose.yml
+# File: docker-compose.yml.
 services:
   backend:
     build:

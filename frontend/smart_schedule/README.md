@@ -9,7 +9,7 @@ This Flutter application manages university timetables for teachers and students
 3. **GET /teacher/{teacherName}/timetable** - Fetch teacher's timetable
 4. **GET /field/{fieldId}/year/{year}/timetables** - Fetch all group timetables for a field and year
 5. **GET /subjects** - Fetch all available subjects (optional endpoint)
-
+ 
 ---
 
 ## Data Models

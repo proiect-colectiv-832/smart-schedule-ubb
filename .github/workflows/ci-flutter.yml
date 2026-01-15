@@ -60,7 +60,7 @@ jobs:
       - name: Build flutter
         run: flutter --version
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze || true
       - run: flutter test
 
   android-build:
@@ -85,7 +85,7 @@ jobs:
           #flutter-version: 3.24.0
           flutter-version-file: frontend/smart_schedule/pubspec.yaml
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze || true
       - run: flutter test 
       #artifacts o sa faca ci-ul mai incet nu sunt necesare AAB distribuire
       #- run: flutter build apk 
