@@ -8,6 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "postinstall": "npm run build",
     "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -41,12 +44,18 @@
     "@opentelemetry/sdk-metrics": "latest"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.0",
     "@types/node": "^24.10.1",
+    "@types/uuid": "^9.0.8",
+    "@types/web-push": "^3.6.4",
+    "eslint": "^9.0.0",
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.0.0"
   }
 }
