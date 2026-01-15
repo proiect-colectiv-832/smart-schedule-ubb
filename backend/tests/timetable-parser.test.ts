@@ -5,7 +5,7 @@ import {
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash
-} from '../src/timetable-parser';
+} from '../src/parsers/timetable-parser';
 import { Timetable } from '../src/types';
 
 // Mock axios

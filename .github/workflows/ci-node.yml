@@ -2,10 +2,14 @@ name: CI-NODE
 on:
   push:
     branches: [main, dev, test]
-    paths: [backend/**]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci-node.yml"
   pull_request:
     branches: [main, dev, test]
-    paths: [backend/**]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci-node.yml"
     types: [opened, reopened, synchronize, labeled, unlabeled]
   pull_request_review:
     types: [submitted]
@@ -43,8 +47,8 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
         cache-dependency-path: backend/package-lock.json
-    - name: Install dependencies
-      run: npm install
-    - run: npm ci
-    #- run: npm test
-    #- run: npm run build
+    - run: npm ci --ignore-scripts
+    - run: npm run typecheck
+    - run: npm run lint
+    - run: npm test
+    - run: npm run build
