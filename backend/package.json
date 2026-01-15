@@ -21,6 +21,14 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@opentelemetry/api": "latest",
+    "@opentelemetry/auto-instrumentations-node": "latest",
+    "@opentelemetry/exporter-metrics-otlp-http": "latest",
+    "@opentelemetry/exporter-trace-otlp-http": "latest",
+    "@opentelemetry/resources": "latest",
+    "@opentelemetry/sdk-metrics": "latest",
+    "@opentelemetry/sdk-node": "latest",
+    "@opentelemetry/semantic-conventions": "latest",
     "@types/uuid": "^9.0.8",
     "@types/web-push": "^3.6.4",
     "axios": "^1.6.0",
@@ -33,29 +41,21 @@
     "socket.io": "^4.8.1",
     "typescript": "^5.3.3",
     "uuid": "^9.0.1",
-    "web-push": "^3.6.7",
-    "@opentelemetry/api": "latest",
-    "@opentelemetry/sdk-node": "latest",
-    "@opentelemetry/auto-instrumentations-node": "latest",
-    "@opentelemetry/resources": "latest",
-    "@opentelemetry/semantic-conventions": "latest",
-    "@opentelemetry/exporter-trace-otlp-http": "latest",
-    "@opentelemetry/exporter-metrics-otlp-http": "latest",
-    "@opentelemetry/sdk-metrics": "latest"
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^9.39.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.0",
     "@types/node": "^24.10.1",
     "@types/uuid": "^9.0.8",
     "@types/web-push": "^3.6.4",
-    "eslint": "^9.0.0",
+    "eslint": "^9.39.2",
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.53.0"
   }
 }
