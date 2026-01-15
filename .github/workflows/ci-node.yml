@@ -4,18 +4,10 @@ on:
     branches: [main, dev, test]
     paths:
       - "backend/**"
-    paths-ignore:
-      - "**/*.md"
-      - "README.md"
-      - "docs/**"
   pull_request:
     branches: [main, dev, test]
     paths:
       - "backend/**"
-    paths-ignore:
-      - "**/*.md"
-      - "README.md"
-      - "docs/**"
     types: [opened, reopened, synchronize, labeled, unlabeled]
   pull_request_review:
     types: [submitted]
