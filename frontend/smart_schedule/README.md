@@ -1,6 +1,6 @@
 # Smart Schedule - API Documentation
 
-This Flutter application manages university timetables for teachers and students. Below is the complete API specification showing the expected JSON formats for all endpoints.
+This Flutter application manages university timetables for teachers and students. Below is the complete API specification showing the expected JSON formats for all endpoints. 
 
 ## API Endpoints Overview
 

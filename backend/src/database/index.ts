@@ -5,7 +5,7 @@ export {
   closeMongoDBConnection,
   isConnected,
   initializeMongoDB,
-  type MongoDBConfig,
+  type MongoDBConfig, 
 } from './mongodb';
 
 
