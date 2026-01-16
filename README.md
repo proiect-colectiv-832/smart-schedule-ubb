@@ -316,6 +316,99 @@ Backend-ul este deployment pe Railway (PaaS) și deservește:
 
 ---
 
+## Actualizare Link-uri pentru Semestru/An Nou
+
+### IMPORTANT - Actualizare Obligatorie
+
+La fiecare început de semestru sau an universitar, este **obligatorie actualizarea link-urilor** de parsare pentru a reflecta semestrul curent.
+
+### Link-uri care trebuie modificate:
+
+#### 1. Cache Manager - `backend/src/cache/cache-manager.ts`
+
+**Locație: Liniile 11-13**
+
+```typescript
+const UBB_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar';
+const UBB_INDEX_URL = `${UBB_BASE_URL}/index.html`;
+const UBB_SUBJECTS_LIST_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/disc/index.html';
+```
+
+**Locație: Linia 152**
+
+```typescript
+const UBB_DISC_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-1/disc';
+```
+
+**Ce trebuie schimbat:**
+- `2025-1` → `{AN}-{SEMESTRU}`
+  - `1` = semestrul I (toamnă/iarnă)
+  - `2` = semestrul II (primăvară/vară)
+
+**Exemplu pentru semestrul II al anului 2025-2026:**
+```typescript
+const UBB_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar';
+const UBB_INDEX_URL = `${UBB_BASE_URL}/index.html`;
+const UBB_SUBJECTS_LIST_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-2/disc/index.html';
+const UBB_DISC_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-2/disc';
+```
+
+**Exemplu pentru semestrul I al anului 2026-2027:**
+```typescript
+const UBB_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2026-1/tabelar';
+const UBB_INDEX_URL = `${UBB_BASE_URL}/index.html`;
+const UBB_SUBJECTS_LIST_URL = 'https://www.cs.ubbcluj.ro/files/orar/2026-1/disc/index.html';
+const UBB_DISC_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2026-1/disc';
+```
+
+#### 2. Academic Calendar Scraper - `backend/src/calendar-subscription/academic-calendar-scraper.ts`
+
+**Locație: Linia 245** (parametru default al funcției `scrapeAcademicCalendar`)
+
+```typescript
+export async function scrapeAcademicCalendar(url: string = 'https://www.cs.ubbcluj.ro/invatamant/structura-anului-universitar/'): Promise<AcademicYearStructure[]> {
+```
+
+**Ce trebuie verificat:**
+- Link-ul structurii anului se poate schimba dacă UBB modifică pagina
+- De obicei, link-ul rămâne același, dar se actualizează conținutul HTML
+- Verifică că pagina returnează datele pentru anul academic curent
+
+### Procedura de Actualizare:
+
+1. **Verifică disponibilitatea link-urilor noi:**
+   - Accesează `https://www.cs.ubbcluj.ro/files/orar/{AN}-{SEMESTRU}/tabelar/index.html` în browser
+   - Verifică că pagina există și are date
+
+2. **Actualizează constantele în `cache-manager.ts`:**
+   - Deschide fișierul `backend/src/cache/cache-manager.ts`
+   - Modifică `2025-1` cu semestrul curent la **liniile 11-13 și 152**
+
+3. **Șterge cache-ul vechi:**
+   ```bash
+   cd backend
+   rm -rf src/cache/*.json
+   ```
+   Sau pe Windows PowerShell:
+   ```powershell
+   cd backend
+   Remove-Item src/cache/*.json
+   ```
+
+4. **Repornește serverul pentru a genera cache-ul nou:**
+   ```bash
+   npm start
+   ```
+
+5. **Verifică că datele sunt actualizate:**
+   - Accesează `http://localhost:3000/fields`
+   - Verifică că datele reflectă semestrul curent
+
+### Notă:
+După actualizare, cache-ul va fi regenerat automat la prima cerere către backend, iar job-urile programate vor detecta și notifica modificările în orare.
+
+---
+
 ## Instalare și Rulare
 
 ### Precondiții
