@@ -321,67 +321,77 @@ Backend-ul este deployment pe Railway (PaaS) și deservește:
 ### Precondiții
 
 Node conform `package.json`:
-- Node `>= 20.0.0` (recomandat 20/22)
+- Node `>= 20.0.0` (recomandat versiunea 20 sau 22 LTS)
 
-Verificare:
+#### Verificare versiune instalată:
 ```bash
 node -v
 npm -v
 ```
 
-Dacă folosești nvm:
+#### Instalare Node.js (dacă nu este instalat):
+
+**Opțiunea 1 - Descărcare directă (recomandat pentru Windows):**
+- Descarcă de la [nodejs.org](https://nodejs.org/) versiunea LTS (Long Term Support)
+- Rulează installer-ul și urmează pașii
+
+**Opțiunea 2 - Chocolatey (Windows package manager):**
+```powershell
+choco install nodejs-lts
+```
+
+**Opțiunea 3 - NVM (pentru Linux/Mac):**
 ```bash
-nvm install 22
-nvm use 22
+nvm install 20
+nvm use 20
 ```
 
 ### Backend - Instalare și Rulare
 
-#### Instalare dependințe (recomandat cu lockfile)
+#### Instalare și Pornire (Development)
 
 ```bash
 cd backend
-npm ci
+npm install
+npm start
 ```
 
-#### Build
+Serverul va porni pe portul configurat (default: 3000).
 
-```bash
-npm run build
-```
-
-#### Rulare în development
+#### Rulare în Development Mode (cu auto-reload)
 
 ```bash
 npm run dev
 ```
 
-#### Rulare în production (local)
+#### Build pentru Production
 
 ```bash
 npm run build
-npm start
 ```
 
-#### Typecheck / Lint / Tests
+Acest lucru compilează TypeScript în JavaScript în folderul `dist/`.
+
+#### Verificare Cod
 
 ```bash
+# Type checking
 npm run typecheck
+
+# Linting
 npm run lint
+
+# Teste
 npm test
-```
 
-Coverage:
-```bash
+# Teste cu coverage
 npm run test:coverage
-```
 
-Watch:
-```bash
+# Teste în watch mode
 npm run test:watch
 ```
 
-#### Script util pentru frecvență (din proiect)
+#### Script util pentru frecvență
 
 ```bash
 npm run freq:test
@@ -422,15 +432,6 @@ flutter run -d chrome
 flutter build web --release
 ```
 
-#### Rulare pe Dispozitiv Mobil (pentru testare PWA)
-
-```bash
-# Android
-flutter run -d android
-
-# iOS
-flutter run -d ios
-```
 
 #### Comenzi Utile
 
