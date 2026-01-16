@@ -374,25 +374,66 @@ export async function scrapeAcademicCalendar(url: string = 'https://www.cs.ubbcl
 - De obicei, link-ul rămâne același, dar se actualizează conținutul HTML
 - Verifică că pagina returnează datele pentru anul academic curent
 
+#### 3. Server Endpoints - `backend/server.ts` (OPȚIONAL pentru consistență)
+
+**Locație: Liniile 669, 783-785** - URL-uri de exemplu pentru documentație API
+
+```typescript
+// Linia 669 - exemplu în mesaj de eroare
+example: '/parse?url=https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html',
+
+// Liniile 783-785 - endpoint /example-urls
+examples: {
+  'MIE Year 3, Semester 1, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html',
+  'CTI Year 1, Semester 1, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/CTI1.html',
+  'INFO Year 4, Semester 2, 2024': 'https://www.cs.ubbcluj.ro/files/orar/2024-2/tabelar/INFO4.html',
+}
+```
+
+**NOTĂ:** Acestea sunt doar exemple pentru documentație și testare. Nu afectează funcționalitatea aplicației, dar e recomandat să le actualizezi pentru consistență.
+
+#### 4. Fișiere Generate Automat (NU modifica manual)
+
+**NOTĂ IMPORTANTĂ:** Următoarele fișiere conțin URL-uri dar sunt generate automat. NU le modifica manual!
+
+**a) Folderul `backend/dist/` - Cod compilat JavaScript:**
+- `backend/dist/src/cache/cache-manager.js` (se regenerează din cache-manager.ts prin `npm run build`)
+- `backend/dist/src/calendar-subscription/academic-calendar-scraper.js` (se regenerează din academic-calendar-scraper.ts prin `npm run build`)
+
+**b) Folderul `backend/src/cache/` - Cache JSON generat dinamic:**
+- `backend/src/cache/fields.json` - conține URL-uri către orare generate prin parsare (se șterge și regenerează automat)
+- `backend/src/cache/subjects.json` - listă materii (se regenerează automat)
+- `backend/src/cache/metadata.json` - metadata cache (se regenerează automat)
+
+Aceste fișiere se vor actualiza automat după ce modifici constantele din `cache-manager.ts` și repornești serverul.
+
 ### Procedura de Actualizare:
 
 1. **Verifică disponibilitatea link-urilor noi:**
    - Accesează `https://www.cs.ubbcluj.ro/files/orar/{AN}-{SEMESTRU}/tabelar/index.html` în browser
    - Verifică că pagina există și are date
+   - Verifică că `https://www.cs.ubbcluj.ro/invatamant/structura-anului-universitar/` are datele pentru noul an academic
 
 2. **Actualizează constantele în `cache-manager.ts`:**
    - Deschide fișierul `backend/src/cache/cache-manager.ts`
    - Modifică `2025-1` cu semestrul curent la **liniile 11-13 și 152**
 
-3. **Șterge cache-ul vechi:**
+3. **Șterge cache-ul vechi și rebuild-ul compilat:**
+   
+   Pe Linux/Mac:
    ```bash
    cd backend
    rm -rf src/cache/*.json
+   rm -rf dist/
+   npm run build
    ```
-   Sau pe Windows PowerShell:
+   
+   Pe Windows PowerShell:
    ```powershell
    cd backend
    Remove-Item src/cache/*.json
+   Remove-Item -Recurse -Force dist/
+   npm run build
    ```
 
 4. **Repornește serverul pentru a genera cache-ul nou:**
@@ -403,9 +444,10 @@ export async function scrapeAcademicCalendar(url: string = 'https://www.cs.ubbcl
 5. **Verifică că datele sunt actualizate:**
    - Accesează `http://localhost:3000/fields`
    - Verifică că datele reflectă semestrul curent
+   - Testează un endpoint de timetable pentru a confirma că parsarea funcționează
 
 ### Notă:
-După actualizare, cache-ul va fi regenerat automat la prima cerere către backend, iar job-urile programate vor detecta și notifica modificările în orare.
+După actualizare, cache-ul va fi regenerat automat la prima cerere către backend, iar job-urile programate vor detecta și notifica modificările în orare. Rebuild-ul în `dist/` va conține noile URL-uri compilate.
 
 ---
 
