@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
         ? MobileDataProvider(api: const ApiHandler())
         : WebDataProvider(api: const ApiHandler());
     if (provider is MobileDataProvider) {
-      // Restore personalized timetable if any
+      
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await provider.restorePersonalizedIfAny();
       });
@@ -33,7 +33,7 @@ class MyApp extends StatelessWidget {
         child: MaterialApp(
           title: 'Smart Schedule PWA',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
+      theme: ThemeData(
             cupertinoOverrideTheme: const CupertinoThemeData(),
             textTheme: const TextTheme(
               bodyLarge: TextStyle(decoration: TextDecoration.none),
@@ -95,7 +95,7 @@ class MyApp extends StatelessWidget {
         ),
       );
     } else {
-      // On web, use initialRoute to ensure proper browser back button support
+      
       if (kIsWeb && PlatformService.isWeb) {
         return OverlaySupport.global(
           child: CupertinoApp(

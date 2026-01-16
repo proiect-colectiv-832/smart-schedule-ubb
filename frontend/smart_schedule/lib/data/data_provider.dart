@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:overlay_support/overlay_support.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +9,8 @@ import 'package:smart_schedule/data/base_provider.dart';
 import 'package:smart_schedule/models/field.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/models/timetables.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
+import 'package:smart_schedule/utils/pwa_identity_service.dart';
 
 class MobileDataProvider extends BaseProvider {
   @override
@@ -31,12 +35,10 @@ class MobileDataProvider extends BaseProvider {
     selectedTeacher = teacher;
     setIsLoading(true);
     try {
-      final TeacherTimeTable tt = await api.fetchTeacherTimeTable(
-        teacher: teacher,
-      );
-      currentTimeTable = tt;
-      subjects = _buildSubjectsFromEntries(tt.entries);
-      await _persistPersonalizedIfStudent();
+      
+      
+      await api.fetchTeacherTimeTable(teacher: teacher);
+      
       notifyListeners();
     } finally {
       setIsLoading(false);
@@ -92,12 +94,24 @@ class MobileDataProvider extends BaseProvider {
     }
   }
 
+  void _ensurePersonalizedTimeTable() {
+    
+    
+    if (currentTimeTable == null ||
+        currentTimeTable is TeacherTimeTable ||
+        currentTimeTable is StudentTimeTable) {
+      currentTimeTable = TimeTable(entries: <TimeTableEntry>[]);
+      subjects = <Subject>[];
+    }
+    
+  }
+
   @override
   void addEntry(TimeTableEntry entry) {
-    currentTimeTable ??= TimeTable(entries: <TimeTableEntry>[]);
+    _ensurePersonalizedTimeTable();
     currentTimeTable!.addEntry(entry);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
-    _persistPersonalizedIfStudent();
+    _onPersonalizedTimetableChanged();
     notifyListeners();
     toast('${entry.subjectName} added to your timetable');
   }
@@ -105,13 +119,14 @@ class MobileDataProvider extends BaseProvider {
   @override
   void removeEntry(int id) {
     if (currentTimeTable == null) return;
+    _ensurePersonalizedTimeTable();
     final entry = currentTimeTable!.entries.firstWhere(
       (e) => e.id == id,
       orElse: () => throw StateError('Entry not found'),
     );
     currentTimeTable!.removeEntry(id);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
-    _persistPersonalizedIfStudent();
+    _onPersonalizedTimetableChanged();
     notifyListeners();
     toast('${entry.subjectName} removed from your timetable');
   }
@@ -119,18 +134,19 @@ class MobileDataProvider extends BaseProvider {
   @override
   void updateEntry(TimeTableEntry entry) {
     if (currentTimeTable == null) return;
+    _ensurePersonalizedTimeTable();
     currentTimeTable!.updateEntry(entry);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
-    _persistPersonalizedIfStudent();
+    _onPersonalizedTimetableChanged();
     notifyListeners();
   }
 
   @override
   void addSubject(Subject subject) {
-    currentTimeTable ??= TimeTable(entries: <TimeTableEntry>[]);
+    _ensurePersonalizedTimeTable();
     currentTimeTable!.addSubject(subject);
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
-    _persistPersonalizedIfStudent();
+    _onPersonalizedTimetableChanged();
     notifyListeners();
     toast(
       '${subject.entries.length} ${subject.entries.length == 1 ? 'class' : 'classes'} from ${subject.name} added to your timetable',
@@ -139,16 +155,63 @@ class MobileDataProvider extends BaseProvider {
 
   @override
   void importFromTimeTable(TimeTable timetable) {
-    currentTimeTable ??= TimeTable(entries: <TimeTableEntry>[]);
-    for (final e in timetable.entries) {
-      currentTimeTable!.addEntry(e);
+    
+    
+
+    
+    if (currentTimeTable == null ||
+        currentTimeTable is TeacherTimeTable ||
+        currentTimeTable is StudentTimeTable) {
+      currentTimeTable = TimeTable(entries: <TimeTableEntry>[]);
     }
+
+    
+    final Set<int> existingIds = currentTimeTable!.entries
+        .map((e) => e.id)
+        .toSet();
+
+    
+    
+    
+    int addedCount = 0;
+    for (final entry in timetable.entries) {
+      if (!existingIds.contains(entry.id)) {
+        currentTimeTable!.entries.add(
+          TimeTableEntry(
+            id: entry.id,
+            day: entry.day,
+            interval: TimeInterval(
+              start: entry.interval.start,
+              end: entry.interval.end,
+            ),
+            subjectName: entry.subjectName,
+            teacher: TeacherName(name: entry.teacher.name),
+            frequency: entry.frequency,
+            type: entry.type,
+            room: entry.room,
+            format: entry.format,
+          ),
+        );
+        addedCount++;
+      }
+    }
+
+    
     subjects = _buildSubjectsFromEntries(currentTimeTable!.entries);
-    _persistPersonalizedIfStudent();
+    _onPersonalizedTimetableChanged();
     notifyListeners();
     toast(
-      '${timetable.entries.length} ${timetable.entries.length == 1 ? 'class' : 'classes'} imported to your timetable',
+      '$addedCount ${addedCount == 1 ? 'class' : 'classes'} ${addedCount == 1 ? 'has' : 'have'} been added to your timetable',
     );
+  }
+
+  @override
+  void clearAllEntries() {
+    currentTimeTable = TimeTable(entries: <TimeTableEntry>[]);
+    subjects = <Subject>[];
+    _onPersonalizedTimetableChanged();
+    notifyListeners();
+    toast('All entries have been deleted from your timetable');
   }
 
   List<Subject> _buildSubjectsFromEntries(List<TimeTableEntry> entries) {
@@ -161,14 +224,19 @@ class MobileDataProvider extends BaseProvider {
     return byName.entries
         .map(
           (MapEntry<String, List<TimeTableEntry>> en) =>
-              Subject(name: en.key, id: idx++, entries: en.value),
+              Subject(name: en.key, id: (idx++).toString(), entries: en.value),
         )
         .toList(growable: false);
   }
 
   Future<void> _persistPersonalizedIfStudent() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (currentTimeTable != null && currentTimeTable!.entries.isNotEmpty) {
+    
+    
+    if (currentTimeTable != null &&
+        !(currentTimeTable is TeacherTimeTable) &&
+        !(currentTimeTable is StudentTimeTable) &&
+        currentTimeTable!.entries.isNotEmpty) {
       final List<Map<String, dynamic>> serialized = currentTimeTable!.entries
           .map(
             (e) => <String, dynamic>{
@@ -188,10 +256,16 @@ class MobileDataProvider extends BaseProvider {
           )
           .toList();
       await prefs.setString('personal_timetable', jsonEncode(serialized));
-      // Also save isTeacher state
+      
       await prefs.setBool('is_teacher', isTeacher ?? false);
+    } else if (currentTimeTable == null ||
+        currentTimeTable is TeacherTimeTable ||
+        currentTimeTable is StudentTimeTable) {
+      
+      
+      return;
     } else {
-      // Clear if empty
+      
       await prefs.remove('personal_timetable');
     }
   }
@@ -199,7 +273,7 @@ class MobileDataProvider extends BaseProvider {
   Future<void> restorePersonalizedIfAny() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    // Restore isTeacher state
+    
     final bool? savedIsTeacher = prefs.getBool('is_teacher');
     if (savedIsTeacher != null) {
       isTeacher = savedIsTeacher;
@@ -226,14 +300,61 @@ class MobileDataProvider extends BaseProvider {
             format: x['format'] as String,
           );
         }).toList();
+        
         currentTimeTable = TimeTable(entries: entries);
         subjects = _buildSubjectsFromEntries(entries);
         notifyListeners();
       } catch (e) {
-        // If restore fails, clear corrupted data
+        
         await prefs.remove('personal_timetable');
         await prefs.remove('is_teacher');
+        
+        currentTimeTable = TimeTable(entries: <TimeTableEntry>[]);
+        subjects = <Subject>[];
       }
+    } else {
+      
+      
+      if (currentTimeTable == null ||
+          currentTimeTable is TeacherTimeTable ||
+          currentTimeTable is StudentTimeTable) {
+        currentTimeTable = TimeTable(entries: <TimeTableEntry>[]);
+        subjects = <Subject>[];
+        notifyListeners();
+      }
+    }
+  }
+
+  void _onPersonalizedTimetableChanged() {
+    _persistPersonalizedIfStudent();
+    _queueTimetableSync();
+  }
+
+  void _queueTimetableSync() {
+    if (!PlatformService.isStandalonePwa) {
+      return;
+    }
+    unawaited(_syncPersonalizedTimetableWithBackend());
+  }
+
+  Future<void> _syncPersonalizedTimetableWithBackend() async {
+    try {
+      final String? userId = await PwaIdentityService.ensureUserId();
+      if (userId == null) {
+        return;
+      }
+      final List<TimeTableEntry> entries;
+      if (currentTimeTable != null &&
+          !(currentTimeTable is TeacherTimeTable) &&
+          !(currentTimeTable is StudentTimeTable)) {
+        entries = List<TimeTableEntry>.from(currentTimeTable!.entries);
+      } else {
+        entries = <TimeTableEntry>[];
+      }
+
+      await api.postUserTimetable(userId: userId, entries: entries);
+    } catch (e) {
+      debugPrint('Failed to sync personalized timetable: $e');
     }
   }
 }
@@ -261,11 +382,10 @@ class WebDataProvider extends BaseProvider {
     selectedTeacher = teacher;
     setIsLoading(true);
     try {
-      final TeacherTimeTable tt = await api.fetchTeacherTimeTable(
-        teacher: teacher,
-      );
-      currentTimeTable = tt;
-      subjects = const <Subject>[]; // hidden on web
+      
+      
+      await api.fetchTeacherTimeTable(teacher: teacher);
+      
       notifyListeners();
     } finally {
       setIsLoading(false);
@@ -296,7 +416,7 @@ class WebDataProvider extends BaseProvider {
         year: year,
       );
       currentTimeTable = tt;
-      subjects = const <Subject>[]; // hidden on web
+      subjects = const <Subject>[]; 
       notifyListeners();
     } finally {
       setIsLoading(false);
@@ -320,7 +440,7 @@ class WebDataProvider extends BaseProvider {
     }
   }
 
-  // No-op mutations in web
+  
   @override
   void addEntry(TimeTableEntry entry) {}
   @override
@@ -332,4 +452,7 @@ class WebDataProvider extends BaseProvider {
 
   @override
   void importFromTimeTable(TimeTable timetable) {}
+
+  @override
+  void clearAllEntries() {}
 }

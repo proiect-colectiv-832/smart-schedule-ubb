@@ -45,7 +45,7 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
             ? const Center(child: CupertinoActivityIndicator())
             : Column(
                 children: [
-                  // Header with title and back button
+                  
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                     child: Row(
@@ -72,7 +72,7 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
                       ],
                     ),
                   ),
-                  // Groups list
+                  
                   Expanded(
                     child: ListView.separated(
                       padding: const EdgeInsets.all(16),
@@ -181,82 +181,167 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
     StudentTimeTable timetable,
     BaseProvider provider,
   ) {
-    final entries = timetable.entries;
-    final entryCount = entries.length;
+    final List<TimeTableEntry> entries = List<TimeTableEntry>.from(
+      timetable.entries,
+    );
+    final Set<int> selectedIds = entries.map((e) => e.id).toSet();
 
-    showCupertinoDialog(
+    showCupertinoModalPopup(
       context: context,
-      builder: (BuildContext context) => CupertinoAlertDialog(
-        title: const Text('Import All Classes'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            Text(
-              'This will add $entryCount ${entryCount == 1 ? 'class' : 'classes'} from ${timetable.groupName} to your timetable.',
-              style: const TextStyle(fontSize: 14),
-            ),
-            if (entryCount > 0) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Classes to be added:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: entryCount > 10 ? 10 : entryCount,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    return _ImportEntryItem(entry: entry);
-                  },
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final int selectedCount = selectedIds.length;
+            return SafeArea(
+              top: false,
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.7,
+                decoration: const BoxDecoration(
+                  color: CupertinoColors.systemBackground,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-              ),
-              if (entryCount > 10)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '... and ${entryCount - 10} more',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.systemGrey.darkColor,
-                      fontStyle: FontStyle.italic,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.systemGrey4,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Import classes from ${timetable.groupName}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$selectedCount of ${entries.length} selected',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.systemGrey.darkColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: entries.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No classes available',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: CupertinoColors.systemGrey,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: entries.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final entry = entries[index];
+                                final bool isChecked = selectedIds.contains(
+                                  entry.id,
+                                );
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isChecked) {
+                                        selectedIds.remove(entry.id);
+                                      } else {
+                                        selectedIds.add(entry.id);
+                                      }
+                                    });
+                                  },
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      CupertinoCheckbox(
+                                        value: isChecked,
+                                        onChanged: (bool? value) {
+                                          setState(() {
+                                            if (value == true) {
+                                              selectedIds.add(entry.id);
+                                            } else {
+                                              selectedIds.remove(entry.id);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _ImportEntryDetails(
+                                          entry: entry,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            borderRadius: BorderRadius.circular(10),
+                            color: CupertinoColors.systemGrey5,
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: CupertinoColors.black),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: CupertinoButton.filled(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            borderRadius: BorderRadius.circular(10),
+                            onPressed: () {
+                              final selectedEntries = entries
+                                  .where((e) => selectedIds.contains(e.id))
+                                  .toList();
+                              if (selectedEntries.isEmpty) {
+                                Navigator.of(context).pop();
+                                return;
+                              }
+                              provider.importFromTimeTable(
+                                TimeTable(entries: selectedEntries),
+                              );
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Add selected'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-            ],
-          ],
-        ),
-        actions: <CupertinoDialogAction>[
-          CupertinoDialogAction(
-            isDefaultAction: false,
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Cancel'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () {
-              provider.importFromTimeTable(timetable);
-              Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
 
-class _ImportEntryItem extends StatelessWidget {
+class _ImportEntryDetails extends StatelessWidget {
   final TimeTableEntry entry;
 
-  const _ImportEntryItem({required this.entry});
+  const _ImportEntryDetails({required this.entry});
 
   String _formatTimeOfDay(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -306,7 +391,7 @@ class _ImportEntryItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_formatDay(entry.day)} • ${_formatTimeOfDay(entry.interval.start)} - ${_formatTimeOfDay(entry.interval.end)} • ${entry.room}',
+                  '${_formatDay(entry.day)} • ${_formatTimeOfDay(entry.interval.start)} - ${_formatTimeOfDay(entry.interval.end)} • ${entry.room} • ${entry.format}',
                   style: TextStyle(
                     fontSize: 11,
                     color: CupertinoColors.systemGrey.darkColor,

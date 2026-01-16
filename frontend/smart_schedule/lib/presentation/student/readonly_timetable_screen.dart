@@ -95,14 +95,14 @@ class ReadonlyTimetableScreen extends StatelessWidget {
     BaseProvider provider,
     StudentTimeTable? studentTable,
   ) {
-    // Group entries by day
+    
     final Map<Day, List<TimeTableEntry>> entriesByDay =
         <Day, List<TimeTableEntry>>{};
     for (final entry in entries) {
       entriesByDay.putIfAbsent(entry.day, () => <TimeTableEntry>[]).add(entry);
     }
 
-    // Sort each day's entries by time
+    
     for (final dayEntries in entriesByDay.values) {
       dayEntries.sort((a, b) {
         final aMinutes = a.interval.start.hour * 60 + a.interval.start.minute;
@@ -236,7 +236,7 @@ class ReadonlyTimetableScreen extends StatelessWidget {
   }
 }
 
-// Group Class Card Widget (same design as teacher timetable)
+
 class _GroupClassCard extends StatelessWidget {
   final TimeTableEntry entry;
   final VoidCallback? onAdd;
@@ -322,7 +322,7 @@ class _GroupClassCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // Type icon
+                
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -332,7 +332,7 @@ class _GroupClassCard extends StatelessWidget {
                   child: Icon(typeIcon, size: 24, color: typeColor),
                 ),
                 const SizedBox(width: 12),
-                // Subject name and type
+                
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,7 +367,7 @@ class _GroupClassCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Add button (only on mobile PWA)
+                
                 if (onAdd != null)
                   CupertinoButton(
                     padding: EdgeInsets.zero,
@@ -381,13 +381,13 @@ class _GroupClassCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Divider
+            
             Container(height: 1, color: CupertinoColors.separator),
             const SizedBox(height: 12),
-            // Time and location details
+            
             Row(
               children: [
-                // Time
+                
                 Expanded(
                   child: Row(
                     children: [
@@ -408,7 +408,7 @@ class _GroupClassCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Location
+                
                 Row(
                   children: [
                     const Icon(
@@ -430,7 +430,7 @@ class _GroupClassCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Format
+            
             Row(
               children: [
                 const Icon(
@@ -447,7 +447,7 @@ class _GroupClassCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Frequency badge
+                
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -469,7 +469,7 @@ class _GroupClassCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Teacher
+            
             Row(
               children: [
                 const Icon(

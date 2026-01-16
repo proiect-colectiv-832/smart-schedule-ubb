@@ -19,7 +19,7 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
   @override
   void initState() {
     super.initState();
-    // Defer provider lookup to after first frame so InheritedNotifier is available
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final BaseProvider provider = AppScope.of(context);
       provider.loadTeachers();
@@ -31,7 +31,7 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
     final BaseProvider provider = AppScope.of(context);
     final teachers = provider.teachers;
 
-    // Filter teachers based on search query
+    
     final filteredTeachers = _searchQuery.isEmpty
         ? teachers
         : teachers
@@ -49,7 +49,7 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
             ? const Center(child: CupertinoActivityIndicator())
             : Column(
                 children: [
-                  // Search bar with back button
+                  
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
@@ -77,13 +77,18 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                                 _searchQuery = value;
                               });
                             },
-                            style: const TextStyle(fontSize: 16),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: PlatformService.isWeb
+                                  ? CupertinoColors.black
+                                  : null,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // Results count
+                  
                   if (_searchQuery.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -99,7 +104,7 @@ class _TeacherSelectScreenState extends State<TeacherSelectScreen> {
                       ),
                     ),
                   const SizedBox(height: 8),
-                  // Teachers grid
+                  
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {

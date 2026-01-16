@@ -1,16 +1,20 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:smart_schedule/models/field.dart';
 import 'package:smart_schedule/models/timetable.dart';
 import 'package:smart_schedule/models/timetables.dart';
+import 'package:smart_schedule/utils/platform_service.dart';
+
+import 'dart:html' as html;
 
 class ApiHandler {
   static const String baseUrl =
       'https://smart-schedule-ubb-production.up.railway.app';
   const ApiHandler();
 
-  // Helper method to parse day string to Day enum
+  
   Day _parseDay(String dayStr) {
     switch (dayStr.toLowerCase()) {
       case 'monday':
@@ -32,7 +36,7 @@ class ApiHandler {
     }
   }
 
-  // Helper method to parse frequency string to Frequency enum
+  
   Frequency _parseFrequency(String freqStr) {
     switch (freqStr.toLowerCase()) {
       case 'weekly':
@@ -46,7 +50,7 @@ class ApiHandler {
     }
   }
 
-  // Helper method to parse type string to Type enum
+  
   Type _parseType(String typeStr) {
     switch (typeStr.toLowerCase()) {
       case 'lecture':
@@ -62,7 +66,7 @@ class ApiHandler {
     }
   }
 
-  // Helper method to parse timetable entry from JSON
+  
   TimeTableEntry _parseTimeTableEntry(Map<String, dynamic> json) {
     final interval = json['interval'] as Map<String, dynamic>;
     final start = interval['start'] as Map<String, dynamic>;
@@ -85,6 +89,27 @@ class ApiHandler {
       room: json['room'] as String? ?? '',
       format: json['format'] as String? ?? 'In-person',
     );
+  }
+
+  Map<String, dynamic> _serializeTimeOfDay(TimeOfDay time) {
+    return <String, int>{'hour': time.hour, 'minute': time.minute};
+  }
+
+  Map<String, dynamic> _serializeTimeTableEntry(TimeTableEntry entry) {
+    return <String, dynamic>{
+      'id': entry.id,
+      'day': entry.day.name,
+      'interval': <String, dynamic>{
+        'start': _serializeTimeOfDay(entry.interval.start),
+        'end': _serializeTimeOfDay(entry.interval.end),
+      },
+      'subjectName': entry.subjectName,
+      'teacher': entry.teacher.name,
+      'frequency': entry.frequency.name,
+      'type': entry.type.name,
+      'room': entry.room,
+      'format': entry.format,
+    };
   }
 
   Future<List<TeacherName>> fetchTeachers() async {
@@ -128,7 +153,7 @@ class ApiHandler {
 
         return TeacherTimeTable(name: teacher, entries: entries);
       } else if (response.statusCode == 404) {
-        // Return empty timetable if teacher not found
+        
         return TeacherTimeTable(name: teacher, entries: <TimeTableEntry>[]);
       } else {
         throw Exception(
@@ -171,13 +196,13 @@ class ApiHandler {
     required int year,
   }) async {
     try {
-      // First, fetch all timetables for this field/year
+      
       final timetables = await fetchFieldYearTimeTables(
         field: field,
         year: year,
       );
 
-      // Return the first timetable (or empty if none)
+      
       if (timetables.isNotEmpty) {
         return timetables.first;
       } else {
@@ -231,7 +256,7 @@ class ApiHandler {
           );
         }).toList();
       } else if (response.statusCode == 404) {
-        // Return empty list if not found
+        
         return <StudentTimeTable>[];
       } else {
         throw Exception(
@@ -260,7 +285,7 @@ class ApiHandler {
               .toList();
 
           return Subject(
-            id: json['id'] as int,
+            id: json['id'].toString(),
             name: json['name'] as String,
             entries: entries,
           );
@@ -270,6 +295,65 @@ class ApiHandler {
       }
     } catch (e) {
       throw Exception('Error fetching subjects: $e');
+    }
+  }
+
+  Future<void> postUserTimetable({
+    required String userId,
+    required List<TimeTableEntry> entries,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/user-timetable'),
+        headers: const <String, String>{'Content-Type': 'application/json'},
+        body: jsonEncode(<String, dynamic>{
+          'userId': userId,
+          'entries': entries.map(_serializeTimeTableEntry).toList(),
+        }),
+      );
+
+      if (response.statusCode >= 400) {
+        throw Exception(
+          'Failed to sync timetable: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error syncing user timetable: $e');
+    }
+  }
+
+  
+  
+  
+  Future<void> subscribeToCalendar(String userId) async {
+    try {
+      if (!kIsWeb) {
+        throw Exception('Calendar subscription only supported on web/PWA');
+      }
+
+      if (PlatformService.isAndroid) {
+        
+        
+        final icsUrl = '$baseUrl/icsfilesforusers/$userId.ics';
+
+        
+        
+        html.window.open(icsUrl, '_blank');
+      } else if (PlatformService.isIOS) {
+        
+        final webcalUrl = baseUrl.replaceFirst('https://', 'webcal://');
+        final subscriptionUrl = '$webcalUrl/icsfilesforusers/$userId.ics';
+
+        
+        html.window.location.href = subscriptionUrl;
+      } else {
+        
+        final webcalUrl = baseUrl.replaceFirst('https://', 'webcal://');
+        final subscriptionUrl = '$webcalUrl/icsfilesforusers/$userId.ics';
+        html.window.location.href = subscriptionUrl;
+      }
+    } catch (e) {
+      throw Exception('Error subscribing to calendar: $e');
     }
   }
 }

@@ -55,7 +55,7 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: <Widget>[
-                              // Header with back button
+                              
                               if (PlatformService.isWeb)
                                 Row(
                                   children: [
@@ -131,7 +131,7 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
                               ),
                               const SizedBox(height: 40),
 
-                              // Field Selection Card
+                              
                               Container(
                                 decoration: BoxDecoration(
                                   color: CupertinoColors.white,
@@ -239,7 +239,7 @@ class _FieldSelectScreenState extends State<FieldSelectScreen> {
 
                               const SizedBox(height: 32),
 
-                              // Continue Button
+                              
                               CupertinoButton(
                                 onPressed:
                                     (_selectedField != null &&
@@ -340,15 +340,20 @@ class _FieldDropdown extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              value?.name ?? 'Select a field',
-              style: TextStyle(
-                fontSize: 16,
-                color: value != null
-                    ? CupertinoColors.black
-                    : CupertinoColors.systemGrey.darkColor,
+            Expanded(
+              child: Text(
+                value?.name ?? 'Select a field',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: value != null
+                      ? CupertinoColors.black
+                      : CupertinoColors.systemGrey.darkColor,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
+            const SizedBox(width: 8),
             const Icon(
               CupertinoIcons.chevron_down,
               size: 20,

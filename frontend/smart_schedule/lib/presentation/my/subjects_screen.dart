@@ -14,12 +14,50 @@ class SubjectsScreen extends StatefulWidget {
 
 class _SubjectsScreenState extends State<SubjectsScreen> {
   List<Subject> _allSubjects = [];
+  List<Subject> _filteredSubjects = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadAllSubjects();
+  }
+
+  void _filterSubjects(String query) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _filteredSubjects = _allSubjects;
+      } else {
+        _filteredSubjects = _allSubjects
+            .where(
+              (subject) =>
+                  subject.name.toLowerCase().contains(query.toLowerCase()) ||
+                  subject.id.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
+      }
+    });
+  }
+
+  String _formatDay(Day day) {
+    switch (day) {
+      case Day.monday:
+        return 'Mon';
+      case Day.tuesday:
+        return 'Tue';
+      case Day.wednesday:
+        return 'Wed';
+      case Day.thursday:
+        return 'Thu';
+      case Day.friday:
+        return 'Fri';
+      case Day.saturday:
+        return 'Sat';
+      case Day.sunday:
+        return 'Sun';
+    }
   }
 
   Future<void> _loadAllSubjects() async {
@@ -28,8 +66,10 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
     try {
       _allSubjects = await provider.api.fetchSubjects();
       _allSubjects.sort((a, b) => a.name.compareTo(b.name));
+      _filteredSubjects = _allSubjects;
     } catch (e) {
       _allSubjects = [];
+      _filteredSubjects = [];
     }
 
     setState(() {
@@ -38,10 +78,222 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
   }
 
   void _showSubjectPreview(Subject subject) {
-    showCupertinoDialog(
+    final List<TimeTableEntry> entries = List<TimeTableEntry>.from(
+      subject.entries,
+    );
+    final Set<int> selectedIds = entries.map((e) => e.id).toSet();
+    List<TimeTableEntry> filtered = List<TimeTableEntry>.from(entries);
+    String query = '';
+
+    showCupertinoModalPopup(
       context: context,
-      builder: (BuildContext context) =>
-          _SubjectPreviewDialog(subject: subject),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void filter(String q) {
+              setState(() {
+                query = q;
+                if (q.isEmpty) {
+                  filtered = List<TimeTableEntry>.from(entries);
+                } else {
+                  filtered = entries
+                      .where(
+                        (entry) =>
+                            entry.subjectName.toLowerCase().contains(
+                              q.toLowerCase(),
+                            ) ||
+                            entry.teacher.name.toLowerCase().contains(
+                              q.toLowerCase(),
+                            ) ||
+                            entry.room.toLowerCase().contains(
+                              q.toLowerCase(),
+                            ) ||
+                            _formatDay(
+                              entry.day,
+                            ).toLowerCase().contains(q.toLowerCase()),
+                      )
+                      .toList();
+                }
+              });
+            }
+
+            return SafeArea(
+              top: false,
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.8,
+                decoration: const BoxDecoration(
+                  color: CupertinoColors.systemBackground,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.systemGrey4,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Add ${subject.name}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'ID: ${subject.id}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.systemGrey.darkColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    CupertinoSearchTextField(
+                      prefixIcon: const Icon(
+                        CupertinoIcons.search,
+                        color: CupertinoColors.systemGrey,
+                      ),
+                      placeholder: 'Search entries...',
+                      onChanged: filter,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    if (query.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '${filtered.length} ${filtered.length == 1 ? 'entry' : 'entries'} found',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CupertinoColors.systemGrey.darkColor,
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '${selectedIds.length} of ${entries.length} selected',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: CupertinoColors.systemGrey.darkColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No entries found',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: CupertinoColors.systemGrey,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final entry = filtered[index];
+                                final bool isChecked = selectedIds.contains(
+                                  entry.id,
+                                );
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isChecked) {
+                                        selectedIds.remove(entry.id);
+                                      } else {
+                                        selectedIds.add(entry.id);
+                                      }
+                                    });
+                                  },
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      CupertinoCheckbox(
+                                        value: isChecked,
+                                        onChanged: (bool? value) {
+                                          setState(() {
+                                            if (value == true) {
+                                              selectedIds.add(entry.id);
+                                            } else {
+                                              selectedIds.remove(entry.id);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _EntryPreviewTile(entry: entry),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            borderRadius: BorderRadius.circular(10),
+                            color: CupertinoColors.systemGrey5,
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: CupertinoColors.black),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: CupertinoButton.filled(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            borderRadius: BorderRadius.circular(10),
+                            onPressed: () {
+                              final selectedEntries = entries
+                                  .where((e) => selectedIds.contains(e.id))
+                                  .toList();
+                              if (selectedEntries.isEmpty) {
+                                Navigator.of(context).pop();
+                                return;
+                              }
+                              final BaseProvider provider = AppScope.of(
+                                context,
+                              );
+                              provider.addSubject(
+                                Subject(
+                                  name: subject.name,
+                                  id: subject.id,
+                                  entries: selectedEntries,
+                                ),
+                              );
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Add selected'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -55,7 +307,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
             ? const Center(child: CupertinoActivityIndicator())
             : Column(
                 children: [
-                  // Header with title and back button
+                  
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
@@ -82,12 +334,52 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
                       ],
                     ),
                   ),
-                  // Subjects grid
+                  
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: CupertinoSearchTextField(
+                      prefixIcon: const Icon(
+                        CupertinoIcons.search,
+                        color: CupertinoColors.systemGrey,
+                      ),
+                      placeholder: 'Search subjects...',
+                      onChanged: _filterSubjects,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  if (_searchQuery.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_filteredSubjects.length} ${_filteredSubjects.length == 1 ? 'subject' : 'subjects'} found',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: CupertinoColors.systemGrey.darkColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  
                   Expanded(
                     child: _allSubjects.isEmpty
                         ? Center(
                             child: Text(
                               'No subjects available',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: CupertinoColors.systemGrey.darkColor,
+                              ),
+                            ),
+                          )
+                        : _filteredSubjects.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No subjects found',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: CupertinoColors.systemGrey.darkColor,
@@ -109,9 +401,10 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
                                       mainAxisSpacing: 12,
                                       childAspectRatio: 2.5,
                                     ),
-                                itemCount: _allSubjects.length,
+                                itemCount: _filteredSubjects.length,
                                 itemBuilder: (context, index) {
-                                  final Subject subject = _allSubjects[index];
+                                  final Subject subject =
+                                      _filteredSubjects[index];
                                   return _SubjectTile(
                                     subject: subject,
                                     onTap: () => _showSubjectPreview(subject),
@@ -164,11 +457,11 @@ class _SubjectTile extends StatelessWidget {
                 color: CupertinoColors.black,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
-              '${subject.entries.length} ${subject.entries.length == 1 ? 'class' : 'classes'}',
+              'ID: ${subject.id}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: CupertinoColors.systemGrey.darkColor,
               ),
             ),
@@ -179,10 +472,42 @@ class _SubjectTile extends StatelessWidget {
   }
 }
 
-class _SubjectPreviewDialog extends StatelessWidget {
-  final Subject subject;
+class _EntryPreviewTile extends StatelessWidget {
+  final TimeTableEntry entry;
 
-  const _SubjectPreviewDialog({required this.subject});
+  const _EntryPreviewTile({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_formatDay(entry.day)} • ${_formatTimeOfDay(entry.interval.start)} - ${_formatTimeOfDay(entry.interval.end)}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: CupertinoColors.black,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${entry.room} • ${entry.teacher.name}',
+            style: TextStyle(
+              fontSize: 11,
+              color: CupertinoColors.systemGrey.darkColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   String _formatTimeOfDay(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -204,104 +529,5 @@ class _SubjectPreviewDialog extends StatelessWidget {
       case Day.sunday:
         return 'Sun';
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final BaseProvider provider = AppScope.of(context);
-
-    return CupertinoAlertDialog(
-      title: Text('Add ${subject.name}'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 8),
-          Text(
-            'This will add ${subject.entries.length} ${subject.entries.length == 1 ? 'class' : 'classes'} to your timetable.',
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Classes to be added:',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 200,
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: subject.entries.length > 10
-                  ? 10
-                  : subject.entries.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 4),
-              itemBuilder: (context, index) {
-                final entry = subject.entries[index];
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemGrey6,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_formatDay(entry.day)} • ${_formatTimeOfDay(entry.interval.start)} - ${_formatTimeOfDay(entry.interval.end)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: CupertinoColors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${entry.room} • ${entry.teacher.name}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: CupertinoColors.systemGrey.darkColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          if (subject.entries.length > 10)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '... and ${subject.entries.length - 10} more',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.systemGrey.darkColor,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-        ],
-      ),
-      actions: <CupertinoDialogAction>[
-        CupertinoDialogAction(
-          isDefaultAction: false,
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: const Text('Cancel'),
-        ),
-        CupertinoDialogAction(
-          isDefaultAction: true,
-          onPressed: () {
-            provider.addSubject(subject);
-            Navigator.of(context).pop();
-          },
-          child: const Text('Add'),
-        ),
-      ],
-    );
   }
 }

@@ -33,7 +33,7 @@ class RoleSelectionScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        // Logo/Icon
+                        
                         const Icon(
                           CupertinoIcons.calendar_today,
                           size: 80,
@@ -41,7 +41,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // Title
+                        
                         const Text(
                           'Smart Schedule',
                           textAlign: TextAlign.center,
@@ -53,7 +53,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
 
-                        // Subtitle
+                        
                         Text(
                           'Manage your academic schedule efficiently',
                           textAlign: TextAlign.center,
@@ -64,7 +64,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 48),
 
-                        // Teacher Card
+                        
                         _RoleCard(
                           icon: CupertinoIcons.person_3_fill,
                           title: 'Teacher',
@@ -72,7 +72,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           color: CupertinoColors.systemBlue,
                           onTap: () async {
                             provider.setIsTeacher(true);
-                            // ignore: use_build_context_synchronously
+                            
                             Navigator.of(context).push(
                               createWebAwareRoute<void>(
                                 builder: (_) => const TeacherSelectScreen(),
@@ -82,7 +82,7 @@ class RoleSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
 
-                        // Student Card
+                        
                         _RoleCard(
                           icon: CupertinoIcons.book_fill,
                           title: 'Student',
@@ -91,7 +91,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           color: CupertinoColors.systemGreen,
                           onTap: () async {
                             provider.setIsTeacher(false);
-                            // ignore: use_build_context_synchronously
+                            
                             Navigator.of(context).push(
                               createWebAwareRoute<void>(
                                 builder: (_) => const FieldSelectScreen(),
@@ -165,7 +165,7 @@ class _RoleCardState extends State<_RoleCard> {
           padding: const EdgeInsets.all(24.0),
           child: Row(
             children: [
-              // Icon
+              
               Container(
                 width: 64,
                 height: 64,
@@ -177,7 +177,7 @@ class _RoleCardState extends State<_RoleCard> {
               ),
               const SizedBox(width: 20),
 
-              // Text content
+              
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,7 +202,7 @@ class _RoleCardState extends State<_RoleCard> {
                 ),
               ),
 
-              // Arrow
+              
               Icon(CupertinoIcons.chevron_right, color: widget.color, size: 24),
             ],
           ),

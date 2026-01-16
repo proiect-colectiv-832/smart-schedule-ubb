@@ -15,7 +15,7 @@ class NoSwipePageRoute<T> extends MaterialPageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    // No swipe gesture - just fade transition
+    
     return FadeTransition(
       opacity: animation,
       child: WillPopScope(
