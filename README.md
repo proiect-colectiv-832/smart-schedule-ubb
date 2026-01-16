@@ -1,0 +1,795 @@
+# Smart Schedule UBB
+
+## Prezentare Generală
+
+**Smart Schedule UBB** este o aplicație Progressive Web App (PWA) dezvoltată pentru gestionarea și vizualizarea orarelor universitare la Universitatea Babeș-Bolyai. Aplicația deservește două categorii principale de utilizatori: **studenți** și **cadre didactice**.
+
+### Problema Rezolvată
+
+Înainte de Smart Schedule, utilizatorii se confruntau cu următoarele probleme:
+- Accesul dificil la orare actualizate
+- Lipsa posibilității de personalizare a orarului
+- Imposibilitatea de a vizualiza orarul într-un format prietenos pe mobil
+- Necesitatea de a naviga prin multiple surse pentru a găsi informații despre cursuri
+- Integrare dificilă cu aplicațiile de calendar (Google Calendar, Apple Calendar)
+
+### Soluția Oferită
+
+Aplicația răspunde nevoii studenților și profesorilor de a accesa rapid și eficient orarul academic, fie de pe dispozitive mobile, fie de pe desktop. Prin natura sa de PWA, aplicația poate fi instalată pe dispozitivele mobile și funcționează similar unei aplicații native, oferind acces offline și notificări.
+
+### Caracteristici Principale
+
+1. **Accesibilitate** - Interfață responsive pentru toate dispozitivele (mobile, tablet, desktop)
+2. **Personalizare** - Posibilitatea studenților de a-și personaliza orarul cu cursuri opționale
+3. **Persistență** - Salvarea preferințelor utilizatorului local și sincronizare cu backend-ul
+4. **Experiență nativă** - Funcționare ca aplicație nativă pe mobile prin instalare PWA
+5. **Dual-mode** - Suport pentru vizualizare (web) și editare (PWA mobil instalat)
+6. **Calendar Subscription** - Export în format iCalendar (.ics) pentru integrare cu aplicații de calendar
+7. **Notificări** - Alertă automată în caz de modificări ale orarului
+
+---
+
+## Arhitectură
+
+Aplicația este compusă din două componente principale:
+
+### Frontend - PWA (Flutter)
+
+Aplicația client este dezvoltată în Flutter și funcționează ca PWA, oferind:
+- Interfață utilizator în stil iOS (Cupertino widgets)
+- Mod de vizualizare (web browser) - read-only
+- Mod de editare (PWA instalat pe mobil) - full features
+- Persistență locală folosind SharedPreferences
+- Identificare anonimă prin UUID v4
+
+### Backend - REST API (Node.js + TypeScript)
+
+Backend-ul expune un REST API consumat de aplicația Flutter și are următoarele responsabilități:
+- Parsare și normalizare date din paginile web UBB (HTML → JSON)
+- Furnizare date despre orare (studenți și cadre didactice)
+- Cache-uire date pentru performanță
+- Generare feed-uri iCalendar (.ics) bazate pe token-uri unice
+- Stocare și sincronizare orare personalizate
+- Detectare modificări orare și trimitere notificări push
+- Rulare job-uri programate (cron)
+
+Backend-ul este deployment pe Railway (PaaS) și deservește:
+- **Web browser**: consum read-only (vizualizare / listare)
+- **PWA mobil**: consum read-write (personalizare, export, notificări, sincronizare)
+
+---
+
+## Diagrame Arhitecturale
+
+### Arhitectura de Ansamblu
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        UTILIZATORI                              │
+│                                                                 │
+│   ┌─────────────────┐              ┌─────────────────┐         │
+│   │   Web Browser   │              │  PWA (Mobil)    │         │
+│   │   (Read-Only)   │              │ (Full Features) │         │
+│   └────────┬────────┘              └────────┬────────┘         │
+│            │                                │                   │
+└────────────┼────────────────────────────────┼───────────────────┘
+             │                                │
+             └────────────┬───────────────────┘
+                          │ HTTPS/REST API
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    BACKEND (Railway)                            │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  REST API (Express + TypeScript)                         │   │
+│  │  • /teachers - Lista profesori                           │   │
+│  │  • /fields - Lista domenii                               │   │
+│  │  • /timetables - Orare                                   │   │
+│  │  • /calendar - ICS Generation                            │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                          │                                      │
+│         ┌────────────────┼────────────────┐                    │
+│         ▼                ▼                ▼                    │
+│  ┌──────────┐    ┌──────────┐    ┌──────────────┐            │
+│  │  Parsers │    │  Cache   │    │   Database   │            │
+│  │  (HTML→  │    │  (JSON)  │    │  (MongoDB)   │            │
+│  │   JSON)  │    │          │    │              │            │
+│  └──────────┘    └──────────┘    └──────────────┘            │
+│         │                                │                     │
+│         ▼                                ▼                     │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  Jobs & Notifications                                    │  │
+│  │  • Cron jobs (detectare modificări)                      │  │
+│  │  • Web Push (notificări)                                 │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  SURSE EXTERNE                                  │
+│  • cs.ubbcluj.ro/orar (HTML pages - Web scraping)              │
+│  • www.ubbcluj.ro (Academic calendar)                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Arhitectura Backend
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                           ENTRY POINT                            │
+│  server.ts  (Express app + routes + bootstrap)                   │
+└──────────────────────────────────────────────────────────────────┘
+│
+▼
+┌──────────────────────────────────────────────────────────────────┐
+│                           DOMAIN MODULES                         │
+│  src/parsers/                 src/calendar-subscription/         │
+│  - timetable-parser           - token manager                    │
+│  - teacher-list-parser        - ics generator                    │
+│  - subject-list-parser        - timetable->events converter      │
+│  - specialization-parser      - academic calendar scraper        │
+│                               - user timetable manager           │
+└──────────────────────────────────────────────────────────────────┘
+│
+▼
+┌──────────────────────────────────────────────────────────────────┐
+│                         SUPPORT MODULES                          │
+│  src/cache/                  src/database/                       │
+│  - cache-manager             - mongodb connection                │
+│  - json cache files          - user-timetable-db                 │
+│  src/jobs/                   src/notifications/                  │
+│  - timetable-comparison-job  - push notification manager         │
+│                              - notification manager/types        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Arhitectura Frontend
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              SMART SCHEDULE PWA                             │
+│                                                                             │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                         PRESENTATION LAYER                         │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │    │
+│  │  │    Screens   │  │   Widgets    │  │  TabScaffold │            │    │
+│  │  │              │  │              │  │              │            │    │
+│  │  │ • RoleSelect │  │ • RoleCard   │  │ • Browse Tab │            │    │
+│  │  │ • FieldSelect│  │ • InfoPill   │  │ • MyTimetable│            │    │
+│  │  │ • GroupsList │  │ • EntryCard  │  │     Tab      │            │    │
+│  │  │ • Student TT │  │ • DaySection │  │              │            │    │
+│  │  │ • Teacher TT │  │              │  │              │            │    │
+│  │  │ • MyTimetable│  │              │  │              │            │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘            │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                      │                                     │
+│                                      ▼                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                           STATE MANAGEMENT                         │    │
+│  │                                                                    │    │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │    │
+│  │  │                         AppScope                            │  │    │
+│  │  │                  (InheritedNotifier)                        │  │    │
+│  │  │                           │                                 │  │    │
+│  │  │           ┌───────────────┴───────────────┐                │  │    │
+│  │  │           ▼                               ▼                │  │    │
+│  │  │  ┌─────────────────┐            ┌─────────────────┐       │  │    │
+│  │  │  │ MobileProvider  │            │ WebProvider     │       │  │    │
+│  │  │  │ (Full Features) │            │ (Read-Only)     │       │  │    │
+│  │  │  │                 │            │                 │       │  │    │
+│  │  │  │ • Personalize   │            │ • View Only     │       │  │    │
+│  │  │  │ • Persistence   │            │ • No Edit       │       │  │    │
+│  │  │  │ • Backend Sync  │            │                 │       │  │    │
+│  │  │  └─────────────────┘            └─────────────────┘       │  │    │
+│  │  └─────────────────────────────────────────────────────────────┘  │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                      │                                     │
+│                                      ▼                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                            DATA LAYER                              │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐ │    │
+│  │  │  API Handler │  │    Models    │  │      Services            │ │    │
+│  │  │              │  │              │  │                          │ │    │
+│  │  │ • Teachers   │  │ • TimeTable  │  │ • PlatformService        │ │    │
+│  │  │ • Fields     │  │ • Entry      │  │ • PwaIdentityService     │ │    │
+│  │  │ • Timetables │  │ • Subject    │  │ • TimetableExporter      │ │    │
+│  │  │ • Sync       │  │ • Field      │  │                          │ │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────────┘ │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                      │                                     │
+│                                      ▼                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                          EXTERNAL SERVICES                         │    │
+│  │  ┌──────────────────────────────────────────────────────────────┐ │    │
+│  │  │                    Railway Backend API                       │ │    │
+│  │  │        https://smart-schedule-ubb-production.up.railway.app │ │    │
+│  │  │                                                              │ │    │
+│  │  │  Endpoints:                                                  │ │    │
+│  │  │  • GET  /teachers          - Lista profesori                │ │    │
+│  │  │  • GET  /teacher/:name/timetable - Orar profesor            │ │    │
+│  │  │  • GET  /fields            - Lista domenii                  │ │    │
+│  │  │  • GET  /timetables/:field/:year - Orare pe domeniu/an     │ │    │
+│  │  │  • POST /user-timetable    - Sincronizare orar personalizat│ │    │
+│  │  └──────────────────────────────────────────────────────────────┘ │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Cerințe Funcționale și Non-funcționale
+
+### Cerințe Funcționale - Backend
+
+| ID | Cerință | Descriere | Consumator |
+|----|---------|-----------|------------|
+| F1 | Parsare orar student | Parsare pagini UBB pentru orar pe grupă/ani | Backend intern |
+| F2 | Parsare orar profesor | Parsare și normalizare pentru cadre didactice | Backend intern |
+| F3 | Parsare liste | Liste de specializări/materii/profesori din pagini UBB | Flutter |
+| F4 | Cache date | Cache în fișiere JSON pentru liste și date derivate | Flutter/Backend |
+| F5 | Calendar subscription | Generare URL/token și feed ICS | Flutter/PWA |
+| F6 | Persistență user timetable | Stocare orar/evenimente per user (DB și/sau fișiere) | PWA |
+| F7 | Job de comparație | Detectare diferențe între versiuni de orar și trigger notificări | Backend intern |
+| F8 | Notificări push | Gestionare notificări (ex. web-push) | PWA |
+
+### Cerințe Funcționale - Frontend
+
+| ID | Cerință | Descriere | Actor |
+|----|---------|-----------|-------|
+| F1 | Selectare rol | Utilizatorul poate alege între rolul de student sau profesor | Toți |
+| F2 | Vizualizare orare profesori | Căutare și vizualizare orar pentru orice profesor | Toți |
+| F3 | Selectare domeniu studii | Studenții selectează domeniul și anul de studiu | Student |
+| F4 | Selectare grupă | Studenții selectează grupa pentru vizualizarea orarului specific | Student |
+| F5 | Vizualizare orar student | Afișare orar pe zile, ore, materii | Student |
+| F6 | Personalizare orar | Adăugare/ștergere cursuri din orarul personal (doar PWA mobil) | Student PWA |
+| F7 | Adăugare materii opționale | Adăugare de cursuri opționale în orar | Student PWA |
+| F8 | Import orar profesor | Import complet al orarului unui profesor | Student PWA |
+| F9 | Export orar | Export în format Markdown sau imagine | Toți |
+| F10 | Persistență locală | Salvare automată a orarului personalizat | Student PWA |
+| F11 | Sincronizare backend | Sincronizare cu serverul pentru backup | Student PWA |
+
+### Cerințe Non-funcționale - Backend
+
+| ID | Cerință | Descriere | Metrică |
+|----|---------|-----------|---------|
+| NF1 | Performanță | Liste/timetables din cache să fie rapide | < 500–800 ms tipic |
+| NF2 | Stabilitate API | Răspuns JSON predictibil | compatibilitate în timp |
+| NF3 | Robusteză parsare | Timeouts + validateStatus + fallback | fără crash la input invalid |
+| NF4 | Securitate | Token-uri pentru calendar; fără PII | acces controlat prin token |
+| NF5 | Observabilitate | log + status codes | erori coerente |
+| NF6 | Portabilitate | configurare prin env | Railway vars / .env |
+
+### Cerințe Non-funcționale - Frontend
+
+| ID | Cerință | Descriere | Metrică |
+|----|---------|-----------|---------|
+| NF1 | Performanță | Încărcare rapidă a aplicației | < 3 secunde |
+| NF2 | Responsive Design | Funcționare pe toate dimensiunile ecran | Mobile, Tablet, Desktop |
+| NF3 | Offline Support | Funcționare fără conexiune (pentru orarul salvat) | PWA cache |
+| NF4 | Instalabilitate | Posibilitate de instalare pe mobil | PWA manifest |
+| NF5 | Cross-platform | Compatibilitate iOS și Android | Safari, Chrome |
+| NF6 | Securitate | Identificare anonimă prin UUID | UUID v4 |
+| NF7 | Scalabilitate | Suport pentru multiple domenii și ani | Nelimitat |
+| NF8 | Usability | Interfață intuitivă în stil iOS (Cupertino) | UX consistent |
+
+---
+
+
+## Tehnologii Utilizate
+
+### Stack Backend
+
+| Tehnologie | Versiune/Observație | Scop |
+|-----------|----------------------|------|
+| Node.js | engines: >= 20.0.0 | runtime |
+| TypeScript | ^5.3.x | tipare statică + build |
+| Express | ^5.1.0 | server HTTP + routing |
+| Axios | ^1.6.x | HTTP fetch pentru paginile UBB |
+| Cheerio | ^1.0.0-rc.12 | parsare HTML (jQuery-like) |
+| MongoDB Driver | ^7.x | persistenta user timetable, token-uri |
+| node-cron | ^4.2.1 | job-uri programate |
+| socket.io | ^4.8.1 | comunicare realtime (dacă e folosită de server) |
+| web-push | ^3.6.7 | notificări push |
+| ical-generator | ^10.0.0 | generare iCalendar/ICS |
+| Jest + ts-jest | ^29.x | testare TypeScript |
+| ESLint + typescript-eslint | ^9.x / ^8.x | lint + standardizare cod |
+
+### Stack Frontend
+
+| Tehnologie | Versiune | Scop |
+|------------|----------|------|
+| Flutter | 3.x | Framework principal pentru dezvoltare cross-platform |
+| Dart | 3.x | Limbaj de programare |
+| Cupertino Widgets | - | Design iOS-native pentru UI |
+| shared_preferences | - | Persistență locală (LocalStorage) |
+| http | - | Comunicare HTTP cu backend-ul |
+| overlay_support | - | Toast notifications |
+| uuid | - | Generare identificatori unici |
+| url_launcher | - | Lansare URL-uri externe |
+
+### Hosting & Operare
+
+| Componentă | Scop |
+|-----------|------|
+| Railway | deploy și runtime |
+| REST + JSON | contract client-server |
+| Fișiere JSON în `src/cache/` | cache persistent local în proiect |
+
+---
+
+## Instalare și Rulare
+
+### Precondiții
+
+Node conform `package.json`:
+- Node `>= 20.0.0` (recomandat 20/22)
+
+Verificare:
+```bash
+node -v
+npm -v
+```
+
+Dacă folosești nvm:
+```bash
+nvm install 22
+nvm use 22
+```
+
+### Backend - Instalare și Rulare
+
+#### Instalare dependințe (recomandat cu lockfile)
+
+```bash
+cd backend
+npm ci
+```
+
+#### Build
+
+```bash
+npm run build
+```
+
+#### Rulare în development
+
+```bash
+npm run dev
+```
+
+#### Rulare în production (local)
+
+```bash
+npm run build
+npm start
+```
+
+#### Typecheck / Lint / Tests
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
+
+Coverage:
+```bash
+npm run test:coverage
+```
+
+Watch:
+```bash
+npm run test:watch
+```
+
+#### Script util pentru frecvență (din proiect)
+
+```bash
+npm run freq:test
+```
+
+#### Testare manuală API (calendar flow)
+
+Pornește serverul, apoi rulează:
+```bash
+node test-calendar-api.js
+```
+
+#### Reset complet (când apar probleme de install)
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Frontend - Instalare și Rulare
+
+#### Instalare Dependențe
+
+```bash
+cd frontend/smart_schedule
+flutter pub get
+```
+
+#### Rulare Frontend Web (Development)
+
+```bash
+flutter run -d chrome
+```
+
+#### Build Frontend Web (Production)
+
+```bash
+flutter build web --release
+```
+
+#### Rulare pe Dispozitiv Mobil (pentru testare PWA)
+
+```bash
+# Android
+flutter run -d android
+
+# iOS
+flutter run -d ios
+```
+
+#### Comenzi Utile
+
+```bash
+# Analiză cod
+flutter analyze
+
+# Format cod
+flutter format lib/
+
+# Curățare cache build
+flutter clean && flutter pub get
+```
+
+---
+
+## API Reference
+
+### Convenții
+- Content-Type: `application/json`
+- Erori: recomandat un format standard
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "field/year invalid",
+    "details": { "field": "..." }
+  }
+}
+```
+
+### Endpoint-uri
+
+#### GET `/teachers`
+Returnează lista de profesori (din cache sau parsare).
+
+**200 OK**
+```json
+{
+  "teachers": [
+    { "fullName": "Prof. POPESCU Ion", "name": "POPESCU Ion", "title": "Prof.", "href": "..." }
+  ],
+  "totalCount": 1
+}
+```
+
+#### GET `/teacher/:name/timetable`
+Returnează orarul profesorului (normalizat).
+
+**200 OK**
+```json
+{
+  "teacher": "POPESCU Ion",
+  "entries": [
+    { "day": "Luni", "hours": "08:00-10:00", "frequency": "sapt. 1-14", "room": "C309", "group": "914/1", "type": "Curs", "subject": "Algoritmi", "teacher": "Prof. POPESCU Ion" }
+  ]
+}
+```
+
+**400 Bad Request** (nume invalid)  
+**404 Not Found** (fără date)  
+**500 Internal Server Error**
+
+#### GET `/fields`
+Returnează lista de domenii/specializări (cache).
+
+**200 OK**
+```json
+{
+  "fields": [
+    { "name": "Informatica - linia de studiu romana", "level": "Licenta", "years": [{ "year": 1, "href": "I1.html", "displayText": "Anul 1" }] }
+  ],
+  "totalCount": 1
+}
+```
+
+#### GET `/subjects`
+Returnează lista de discipline (cache).
+
+**200 OK**
+```json
+{
+  "courses": [{ "code": "MME8120", "name": "Adaptive Web Design", "href": "adaptive-web-design.html" }],
+  "totalCount": 1
+}
+```
+
+#### GET `/timetable`
+Exemplu: timetables pe grupă/an (poate fi implementat ca `/timetables/:field/:year` sau prin link direct UBB).
+
+**200 OK**
+```json
+{
+  "academicYear": "2024",
+  "semester": "1",
+  "specialization": "INFO",
+  "yearOfStudy": "3",
+  "entries": [
+    { "day": "Luni", "hours": "08:00-10:00", "frequency": "sapt. 1-14", "room": "309", "group": "211/1", "type": "Curs", "subject": "Algoritmi Paraleli", "teacher": "Prof. Dr. Popescu Ion" }
+  ]
+}
+```
+
+#### POST `/calendar/generate-token`
+Generează token calendar pentru user.
+
+**200 OK**
+```json
+{
+  "data": {
+    "token": "abc123",
+    "subscriptionUrl": "https://.../calendar/abc123.ics"
+  }
+}
+```
+
+#### GET `/calendar/:token.ics`
+Returnează feed iCalendar (text/calendar).
+
+**200 OK**  
+Content-Type: `text/calendar`
+
+#### POST `/timetable/user`
+Salvează orarul unui user (folosit în `test-calendar-api.js`).
+
+**200 OK**
+```json
+{ "ok": true }
+```
+
+#### GET `/timetable/user?userId=...`
+Returnează orarul userului.
+
+**200 OK**
+
+#### POST `/timetable/event`
+Adaugă eveniment custom pentru user.
+
+**200 OK**
+
+#### GET `/timetable/events/default-dates`
+Returnează date semestru default (din `academic-calendar-scraper.ts` sau constant).
+
+**200 OK**
+
+#### GET `/icalendar/generate?userId=...`
+Returnează ICS generat (și opțional `format=json` pentru debug).
+
+**200 OK**
+
+---
+
+## Modele de Date
+
+### TimetableEntry (Backend - `src/types.ts`)
+
+```ts
+export interface TimetableEntry {
+  day: string;
+  hours: string;
+  frequency: string;
+  room: string;
+  group: string;
+  type: string;
+  subject: string;
+  teacher: string;
+}
+```
+
+### Timetable (Backend - `src/types.ts`)
+
+```ts
+export interface Timetable {
+  academicYear: string;
+  semester: string;
+  specialization: string;
+  yearOfStudy: string;
+  entries: TimetableEntry[];
+}
+```
+
+### Modele Frontend
+
+- `TimeTable` - Clasă de bază pentru orare
+- `StudentTimeTable` - Extinde TimeTable, conține Field și Year
+- `TeacherTimeTable` - Extinde TimeTable, conține TeacherName
+- `TimeTableEntry` - Intrare individuală în orar
+- `Subject` - Materie cu lista de intrări asociate
+- `Field` - Domeniu de studiu
+
+---
+
+## Structura Proiectului
+
+```
+smart-schedule-ubb/
+├── backend/                          # Node.js + TypeScript REST API
+│   ├── src/
+│   │   ├── parsers/                  # Web scraping & parsare HTML
+│   │   │   ├── timetable-parser.ts
+│   │   │   ├── teacher-list-parser.ts
+│   │   │   ├── subject-list-parser.ts
+│   │   │   └── specialization-parser.ts
+│   │   │
+│   │   ├── calendar-subscription/    # Generare ICS + token management
+│   │   │   ├── calendar-token-manager.ts
+│   │   │   ├── icalendar-generator.ts
+│   │   │   ├── timetable-to-events-converter.ts
+│   │   │   └── user-timetable-manager.ts
+│   │   │
+│   │   ├── cache/                    # Cache JSON + manager
+│   │   │   ├── cache-manager.ts
+│   │   │   ├── fields.json
+│   │   │   ├── subjects.json
+│   │   │   └── calendar-tokens.json
+│   │   │
+│   │   ├── database/                 # MongoDB integration
+│   │   │   ├── mongodb.ts
+│   │   │   └── user-timetable-db.ts
+│   │   │
+│   │   ├── jobs/                     # Cron jobs
+│   │   │   └── timetable-comparison-job.ts
+│   │   │
+│   │   ├── notifications/            # Push notifications
+│   │   │   ├── push-notification-manager.ts
+│   │   │   └── notification-types.ts
+│   │   │
+│   │   ├── entities/                 # Domain models
+│   │   ├── index.ts
+│   │   └── types.ts
+│   │
+│   ├── tests/                        # Jest tests
+│   │   ├── jest.setup.ts
+│   │   ├── timetable-parser.test.ts
+│   │   └── teacher-list-parser.test.ts
+│   │
+│   ├── server.ts                     # Express app entry point
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── jest.config.js
+│   └── eslint.config.mjs
+│
+├── frontend/                         # Flutter PWA
+│   └── smart_schedule/
+│       ├── lib/
+│       │   ├── main.dart             # Entry point
+│       │   │
+│       │   ├── data/                 # Data Layer
+│       │   │   ├── api_handler.dart
+│       │   │   ├── base_provider.dart
+│       │   │   └── data_provider.dart
+│       │   │
+│       │   ├── models/               # Domain Models
+│       │   │   ├── field.dart
+│       │   │   ├── timetable.dart
+│       │   │   └── timetables.dart
+│       │   │
+│       │   ├── presentation/         # UI Layer
+│       │   │   ├── app_scope.dart
+│       │   │   ├── custom_tab_scaffold.dart
+│       │   │   ├── role_selection.dart
+│       │   │   │
+│       │   │   ├── student/
+│       │   │   │   ├── field_select_screen.dart
+│       │   │   │   ├── groups_list_screen.dart
+│       │   │   │   └── student_timetable_screen.dart
+│       │   │   │
+│       │   │   ├── teacher/
+│       │   │   │   ├── teacher_select_screen.dart
+│       │   │   │   └── teacher_timetable_screen.dart
+│       │   │   │
+│       │   │   └── my/
+│       │   │       ├── my_timetable_screen.dart
+│       │   │       ├── subjects_screen.dart
+│       │   │       └── download_timetable_button.dart
+│       │   │
+│       │   └── utils/                # Services & Utilities
+│       │       ├── platform_service.dart
+│       │       ├── pwa_identity_service.dart
+│       │       └── timetable_exporter.dart
+│       │
+│       ├── web/                      # PWA assets
+│       │   ├── manifest.json
+│       │   ├── index.html
+│       │   └── icons/
+│       │
+│       └── pubspec.yaml
+│
+└── README.md                         # Acest fișier
+```
+
+---
+
+## Testare
+
+### Backend Testing - Jest + ts-jest
+
+Testele backend folosesc **Jest + ts-jest** și se găsesc în `backend/tests/`:
+
+- `timetable-parser.test.ts` - Test parsare orare
+- `teacher-list-parser.test.ts` - Test parsare listă profesori
+- `subject-list-parser.test.ts` - Test parsare discipline
+- `specialization-parser.test.ts` - Test parsare specializări
+
+**Mock-uri:** Axios este mock-uit pentru a evita HTTP calls reale în teste.
+
+#### Setup Jest
+
+`tests/jest.setup.ts`:
+```typescript
+// Polyfill pentru File (necesar pentru unele dependențe)
+if (typeof (globalThis as any).File === "undefined") {
+  (globalThis as any).File = class File {};
+}
+```
+
+`jest.config.js`:
+```javascript
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  setupFiles: ['<rootDir>/tests/jest.setup.ts'],
+  roots: ['<rootDir>/tests', '<rootDir>/src'],
+  testMatch: ['<rootDir>/tests/**/*.test.ts'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
+  },
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  clearMocks: true,
+  verbose: true,
+};
+```
+
+### Frontend Testing
+
+Flutter oferă suport pentru teste unitare, widget și integration:
+
+```bash
+cd frontend/smart_schedule
+
+# Teste unitare/widget
+flutter test
+
+# Integration tests (necesită emulator/device)
+flutter test integration_test/
+```
+
+---
+
+## CI (GitHub Actions)
+
+Backend-ul folosește pipeline pe Node în matrice de versiuni (18/20/22) și rulează:
+
+- `npm ci --ignore-scripts`
+- `npm run typecheck`
+- `npm run lint`
+- `npm test || true`
+- `npm run build`
+
+Observație practică:
+- dacă `postinstall` rulează `npm run build`, atunci `--ignore-scripts` previne build-ul automat la install; build-ul se face explicit la final.
+
