@@ -55,22 +55,37 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
 export async function getRoomLocation(roomCode: string): Promise<RoomLocation | null> {
   const data = await loadRoomLocations();
 
+  // Normalize room code: trim whitespace and remove extra characters
+  const normalizedRoomCode = roomCode.trim();
+
   // Try exact match first
-  if (data.rooms[roomCode]) {
-    return data.rooms[roomCode];
+  if (data.rooms[normalizedRoomCode]) {
+    return data.rooms[normalizedRoomCode];
   }
 
   // Try case-insensitive match
-  const roomCodeUpper = roomCode.toUpperCase();
+  const roomCodeUpper = normalizedRoomCode.toUpperCase();
   const matchingKey = Object.keys(data.rooms).find(
-    key => key.toUpperCase() === roomCodeUpper
+    key => key.trim().toUpperCase() === roomCodeUpper
   );
 
   if (matchingKey) {
     return data.rooms[matchingKey];
   }
 
-  // Room not found - this is not necessarily an error (could be intentional)
+  // Try partial match (in case there are extra characters)
+  const partialMatch = Object.keys(data.rooms).find(
+    key => key.trim().toUpperCase().includes(roomCodeUpper) ||
+           roomCodeUpper.includes(key.trim().toUpperCase())
+  );
+
+  if (partialMatch) {
+    console.log(`⚠️  Room partial match: "${normalizedRoomCode}" -> "${partialMatch}"`);
+    return data.rooms[partialMatch];
+  }
+
+  // Room not found - log for debugging
+  console.log(`❌ Room not found: "${normalizedRoomCode}" (length: ${normalizedRoomCode.length}, chars: ${Array.from(normalizedRoomCode).map(c => c.charCodeAt(0)).join(', ')})`);
   return null;
 }
 

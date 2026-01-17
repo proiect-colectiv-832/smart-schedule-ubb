@@ -276,9 +276,20 @@ export async function convertJSONTimetableToEvents(
       // Get room location information
       let roomInfo = '';
       let locationAddress = '';
+      let debugInfo = '';
+
       if (entry.room) {
         roomInfo = await formatRoomInfoForDescription(entry.room);
         locationAddress = await formatRoomLocationForCalendar(entry.room);
+
+        // Fallback: if no address found, use room code itself
+        if (!locationAddress) {
+          locationAddress = entry.room;
+        }
+
+        // DEBUG: Add debug info to description to see what's happening
+        const roomCodeChars = Array.from(entry.room).map(c => c.charCodeAt(0)).join(',');
+        debugInfo = `\n\n[DEBUG] Room input: "${entry.room}" (len:${entry.room.length}, chars:[${roomCodeChars}])\n[DEBUG] Location output: "${locationAddress}"`;
       }
 
       // Create event
@@ -288,7 +299,7 @@ export async function convertJSONTimetableToEvents(
         startTime,
         endTime,
         location: locationAddress || undefined,
-        description: `Teacher: ${entry.teacher}\nFormat: ${entry.format}\nType: ${entry.type}${roomInfo ? `\n${roomInfo}` : ''}`,
+        description: `Teacher: ${entry.teacher}\nFormat: ${entry.format}\nType: ${entry.type}${roomInfo ? `\n${roomInfo}` : ''}${debugInfo}`,
         isRecurring: true,
         recurrenceRule,
         type,
