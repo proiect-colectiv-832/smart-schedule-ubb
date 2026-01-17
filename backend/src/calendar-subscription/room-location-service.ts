@@ -64,13 +64,17 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
   // Normalize room code: trim whitespace
   const normalizedRoomCode = roomCode.trim();
 
+  // DEBUG: Check if data is loaded properly
+  const allKeys = Object.keys(data.rooms);
+  const totalRooms = allKeys.length;
+
   // Try exact match first (case-sensitive)
   if (data.rooms[normalizedRoomCode]) {
     return data.rooms[normalizedRoomCode];
   }
 
   // Try exact match case-insensitive
-  const matchingKey = Object.keys(data.rooms).find(
+  const matchingKey = allKeys.find(
     key => key.toLowerCase() === normalizedRoomCode.toLowerCase()
   );
 
@@ -78,10 +82,16 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
     return data.rooms[matchingKey];
   }
 
-  // Room not found
-  console.log(`❌ Room not found: "${normalizedRoomCode}"`);
-  console.log(`   Available rooms sample: ${Object.keys(data.rooms).slice(0, 5).join(', ')}`);
-  return null;
+  // Room not found - return detailed info for debugging
+  // Check if similar room exists (for typos)
+  const similarRooms = allKeys.filter(key =>
+    key.toLowerCase().includes(normalizedRoomCode.toLowerCase()) ||
+    normalizedRoomCode.toLowerCase().includes(key.toLowerCase())
+  );
+
+  return {
+    address: `[DEBUG] Room "${normalizedRoomCode}" not found in ${totalRooms} rooms. Similar: ${similarRooms.slice(0, 3).join(', ') || 'none'}. First 5 keys: ${allKeys.slice(0, 5).join(', ')}`
+  };
 }
 
 /**
