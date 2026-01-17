@@ -21,12 +21,17 @@ export interface RoomLocationData {
 
 // Cache for room locations
 let roomLocationsCache: RoomLocationData | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes - refresh cache periodically
 
 /**
  * Load room locations from JSON file
  */
 async function loadRoomLocations(): Promise<RoomLocationData> {
-  if (roomLocationsCache) {
+  const now = Date.now();
+
+  // Invalidate cache after CACHE_DURATION_MS
+  if (roomLocationsCache && (now - cacheTimestamp) < CACHE_DURATION_MS) {
     return roomLocationsCache;
   }
 
@@ -34,6 +39,7 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
     const filePath = path.join(__dirname, 'room-locations.json');
     const fileContent = await fs.readFile(filePath, 'utf-8');
     roomLocationsCache = JSON.parse(fileContent);
+    cacheTimestamp = now;
     console.log(`📍 Room locations loaded: ${Object.keys(roomLocationsCache?.rooms || {}).length} rooms`);
     return roomLocationsCache!;
   } catch (error) {
@@ -55,37 +61,26 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
 export async function getRoomLocation(roomCode: string): Promise<RoomLocation | null> {
   const data = await loadRoomLocations();
 
-  // Normalize room code: trim whitespace and remove extra characters
+  // Normalize room code: trim whitespace
   const normalizedRoomCode = roomCode.trim();
 
-  // Try exact match first
+  // Try exact match first (case-sensitive)
   if (data.rooms[normalizedRoomCode]) {
     return data.rooms[normalizedRoomCode];
   }
 
-  // Try case-insensitive match
-  const roomCodeUpper = normalizedRoomCode.toUpperCase();
+  // Try exact match case-insensitive
   const matchingKey = Object.keys(data.rooms).find(
-    key => key.trim().toUpperCase() === roomCodeUpper
+    key => key.toLowerCase() === normalizedRoomCode.toLowerCase()
   );
 
   if (matchingKey) {
     return data.rooms[matchingKey];
   }
 
-  // Try partial match (in case there are extra characters)
-  const partialMatch = Object.keys(data.rooms).find(
-    key => key.trim().toUpperCase().includes(roomCodeUpper) ||
-           roomCodeUpper.includes(key.trim().toUpperCase())
-  );
-
-  if (partialMatch) {
-    console.log(`⚠️  Room partial match: "${normalizedRoomCode}" -> "${partialMatch}"`);
-    return data.rooms[partialMatch];
-  }
-
-  // Room not found - log for debugging
-  console.log(`❌ Room not found: "${normalizedRoomCode}" (length: ${normalizedRoomCode.length}, chars: ${Array.from(normalizedRoomCode).map(c => c.charCodeAt(0)).join(', ')})`);
+  // Room not found
+  console.log(`❌ Room not found: "${normalizedRoomCode}"`);
+  console.log(`   Available rooms sample: ${Object.keys(data.rooms).slice(0, 5).join(', ')}`);
   return null;
 }
 
