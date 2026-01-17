@@ -76,14 +76,15 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
 
 /**
  * Format room location as a string for calendar location field
- * Returns the full address directly
+ * Returns the full address if available, otherwise the room code
  */
 export async function formatRoomLocationForCalendar(roomCode: string): Promise<string> {
   const location = await getRoomLocation(roomCode);
 
-
   if (!location || !location.address) {
-    return ''; // Empty if room not found or no address
+    // If room not found in database, return the room code itself
+    // This ensures LOCATION is always populated in ICS
+    return roomCode;
   }
 
   return location.address;
