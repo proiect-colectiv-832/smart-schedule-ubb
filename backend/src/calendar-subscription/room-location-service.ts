@@ -36,17 +36,52 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
   }
 
   try {
-    const filePath = path.join(__dirname, 'room-locations.json');
-    const fileContent = await fs.readFile(filePath, 'utf-8');
-    roomLocationsCache = JSON.parse(fileContent);
+    // Try multiple paths (for development and production)
+    const possiblePaths = [
+      path.join(__dirname, 'room-locations.json'),                    // Same dir (production)
+      path.join(__dirname, '../../src/calendar-subscription/room-locations.json'), // From dist back to src
+      path.join(process.cwd(), 'src/calendar-subscription/room-locations.json'),   // From project root
+    ];
+
+    let fileContent: string | null = null;
+    let usedPath: string | null = null;
+
+    for (const filePath of possiblePaths) {
+      try {
+        fileContent = await fs.readFile(filePath, 'utf-8');
+        usedPath = filePath;
+        break;
+      } catch (err) {
+        // Try next path
+        continue;
+      }
+    }
+
+    if (!fileContent || !usedPath) {
+      throw new Error(`room-locations.json not found in any of: ${possiblePaths.join(', ')}`);
+    }
+
+    console.log(`✅ Loaded room locations from: ${usedPath}`);
+
+    const parsed = JSON.parse(fileContent);
+    const roomCount = Object.keys(parsed?.rooms || {}).length;
+    console.log(`✅ Parsed ${roomCount} rooms`);
+
+    roomLocationsCache = parsed;
     cacheTimestamp = now;
-    console.log(`📍 Room locations loaded: ${Object.keys(roomLocationsCache?.rooms || {}).length} rooms`);
+
     return roomLocationsCache!;
   } catch (error) {
     console.error('❌ Error loading room locations:', error);
-    // Return empty structure as fallback
+
+    // Return fallback with error message for debugging
+    const errorMsg = error instanceof Error ? error.message : String(error);
     return {
-      rooms: {},
+      rooms: {
+        'ERROR': {
+          address: `[ERROR] ${errorMsg}. __dirname: ${__dirname}, cwd: ${process.cwd()}`
+        }
+      },
       metadata: {
         lastUpdated: new Date().toISOString(),
         version: '1.0.0'
@@ -67,6 +102,11 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
   // DEBUG: Check if data is loaded properly
   const allKeys = Object.keys(data.rooms);
   const totalRooms = allKeys.length;
+
+  // Check if we have the ERROR key (means JSON failed to load)
+  if (data.rooms['ERROR']) {
+    return data.rooms['ERROR'];
+  }
 
   // Try exact match first (case-sensitive)
   if (data.rooms[normalizedRoomCode]) {
@@ -90,7 +130,7 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
   );
 
   return {
-    address: `[DEBUG] Room "${normalizedRoomCode}" not found in ${totalRooms} rooms. Similar: ${similarRooms.slice(0, 3).join(', ') || 'none'}. First 5 keys: ${allKeys.slice(0, 5).join(', ')}`
+    address: `[DEBUG] "${normalizedRoomCode}" not in ${totalRooms} rooms. Similar: ${similarRooms.slice(0, 3).join(', ') || 'none'}. Sample: ${allKeys.slice(0, 5).join(', ')}`
   };
 }
 
