@@ -17,6 +17,34 @@ const TIMEZONE = 'Europe/Bucharest';
 const CALENDAR_NAME = 'UBB Smart Schedule';
 const CALENDAR_DESCRIPTION = 'Your personalized UBB timetable';
 
+/**
+ * Generate VTIMEZONE component for Europe/Bucharest
+ * This is required for strict iCalendar validators and Apple Calendar
+ */
+function getTimezoneGenerator() {
+  return function () {
+    return [
+      'BEGIN:VTIMEZONE',
+      'TZID:Europe/Bucharest',
+      'BEGIN:DAYLIGHT',
+      'TZOFFSETFROM:+0200',
+      'TZOFFSETTO:+0300',
+      'TZNAME:EEST',
+      'DTSTART:19700329T030000',
+      'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
+      'END:DAYLIGHT',
+      'BEGIN:STANDARD',
+      'TZOFFSETFROM:+0300',
+      'TZOFFSETTO:+0200',
+      'TZNAME:EET',
+      'DTSTART:19701025T040000',
+      'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
+      'END:STANDARD',
+      'END:VTIMEZONE'
+    ].join('\r\n');
+  };
+}
+
 // Cache pentru structura academică (să nu facem scraping la fiecare request)
 let cachedAcademicStructure: AcademicYearStructure | null = null;
 let cacheTimestamp: Date | null = null;
@@ -86,7 +114,10 @@ export async function generateICalendar(
   const calendar = ical({
     name: CALENDAR_NAME,
     description: CALENDAR_DESCRIPTION,
-    timezone: TIMEZONE,
+    timezone: {
+      name: TIMEZONE,
+      generator: getTimezoneGenerator()
+    },
     ttl: 3600, // Refresh every hour
     prodId: {
       company: 'UBB Cluj-Napoca',
@@ -319,6 +350,7 @@ function addEventToCalendar(
     ];
   }
 
+
   calendar.createEvent(eventData);
 }
 
@@ -514,7 +546,10 @@ export async function generateICalendarForDateRange(
   const calendar = ical({
     name: `${CALENDAR_NAME} (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
     description: CALENDAR_DESCRIPTION,
-    timezone: TIMEZONE,
+    timezone: {
+      name: TIMEZONE,
+      generator: getTimezoneGenerator()
+    },
     ttl: 3600,
     prodId: {
       company: 'UBB Cluj-Napoca',
@@ -660,3 +695,4 @@ export function getCalendarMetadata(timetable: UserTimetable): {
 
   return metadata;
 }
+
