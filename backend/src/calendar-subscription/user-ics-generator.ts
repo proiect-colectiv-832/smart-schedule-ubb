@@ -276,28 +276,10 @@ export async function convertJSONTimetableToEvents(
       // Get room location information
       let roomInfo = '';
       let locationAddress = '';
-      let debugInfo = '';
 
       if (entry.room) {
-        // Import for detailed debugging
-        const roomLocationService = await import('./room-location-service');
-
         roomInfo = await formatRoomInfoForDescription(entry.room);
-        const roomLocationData = await roomLocationService.getRoomLocation(entry.room);
         locationAddress = await formatRoomLocationForCalendar(entry.room);
-
-        // Fallback: if no address found, use room code itself
-        if (!locationAddress) {
-          locationAddress = entry.room;
-        }
-
-        // DEBUG: Add detailed debug info
-        debugInfo = `\n\n[DEBUG] Room: "${entry.room}"`;
-        debugInfo += `\n[DEBUG] Found in JSON: ${roomLocationData ? 'YES' : 'NO'}`;
-        if (roomLocationData) {
-          debugInfo += `\n[DEBUG] Address: "${roomLocationData.address}"`;
-        }
-        debugInfo += `\n[DEBUG] Final location: "${locationAddress}"`;
       }
 
       // Create event
@@ -307,7 +289,7 @@ export async function convertJSONTimetableToEvents(
         startTime,
         endTime,
         location: locationAddress || undefined,
-        description: `Teacher: ${entry.teacher}\nFormat: ${entry.format}\nType: ${entry.type}${roomInfo ? `\n${roomInfo}` : ''}${debugInfo}`,
+        description: `Teacher: ${entry.teacher}\nFormat: ${entry.format}\nType: ${entry.type}${roomInfo ? `\n${roomInfo}` : ''}`,
         isRecurring: true,
         recurrenceRule,
         type,

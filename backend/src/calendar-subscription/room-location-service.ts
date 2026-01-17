@@ -53,19 +53,16 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
         break;
       } catch (err) {
         // Try next path
-        continue;
       }
     }
 
     if (!fileContent || !usedPath) {
-      throw new Error(`room-locations.json not found in any of: ${possiblePaths.join(', ')}`);
+      throw new Error(`room-locations.json not found in any path`);
     }
-
-    console.log(`✅ Loaded room locations from: ${usedPath}`);
 
     const parsed = JSON.parse(fileContent);
     const roomCount = Object.keys(parsed?.rooms || {}).length;
-    console.log(`✅ Parsed ${roomCount} rooms`);
+    console.log(`📍 Room locations loaded: ${roomCount} rooms from ${path.basename(usedPath)}`);
 
     roomLocationsCache = parsed;
     cacheTimestamp = now;
@@ -74,14 +71,9 @@ async function loadRoomLocations(): Promise<RoomLocationData> {
   } catch (error) {
     console.error('❌ Error loading room locations:', error);
 
-    // Return fallback with error message for debugging
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    // Return empty structure as fallback
     return {
-      rooms: {
-        'ERROR': {
-          address: `[ERROR] ${errorMsg}. __dirname: ${__dirname}, cwd: ${process.cwd()}`
-        }
-      },
+      rooms: {},
       metadata: {
         lastUpdated: new Date().toISOString(),
         version: '1.0.0'
@@ -99,21 +91,13 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
   // Normalize room code: trim whitespace
   const normalizedRoomCode = roomCode.trim();
 
-  // DEBUG: Check if data is loaded properly
-  const allKeys = Object.keys(data.rooms);
-  const totalRooms = allKeys.length;
-
-  // Check if we have the ERROR key (means JSON failed to load)
-  if (data.rooms['ERROR']) {
-    return data.rooms['ERROR'];
-  }
-
   // Try exact match first (case-sensitive)
   if (data.rooms[normalizedRoomCode]) {
     return data.rooms[normalizedRoomCode];
   }
 
   // Try exact match case-insensitive
+  const allKeys = Object.keys(data.rooms);
   const matchingKey = allKeys.find(
     key => key.toLowerCase() === normalizedRoomCode.toLowerCase()
   );
@@ -122,16 +106,8 @@ export async function getRoomLocation(roomCode: string): Promise<RoomLocation | 
     return data.rooms[matchingKey];
   }
 
-  // Room not found - return detailed info for debugging
-  // Check if similar room exists (for typos)
-  const similarRooms = allKeys.filter(key =>
-    key.toLowerCase().includes(normalizedRoomCode.toLowerCase()) ||
-    normalizedRoomCode.toLowerCase().includes(key.toLowerCase())
-  );
-
-  return {
-    address: `[DEBUG] "${normalizedRoomCode}" not in ${totalRooms} rooms. Similar: ${similarRooms.slice(0, 3).join(', ') || 'none'}. Sample: ${allKeys.slice(0, 5).join(', ')}`
-  };
+  // Room not found
+  return null;
 }
 
 /**
