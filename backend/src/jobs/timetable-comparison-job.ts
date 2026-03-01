@@ -2,6 +2,10 @@
  * Timetable Comparison Job
  * Compares current scraped timetables with stored timetables
  * and creates notifications when changes are detected.
+ * 
+ * NEW FEATURE: Automatically regenerates ICS calendar files for users
+ * when their timetable changes are detected, ensuring calendar
+ * subscriptions stay up-to-date.
  */
 
 import { 
@@ -17,6 +21,10 @@ import {
   NotificationType, 
   NotificationPriority 
 } from '../notifications/notification-types';
+import { 
+  generateUserICSFile,
+  userICSFileExists
+} from '../calendar-subscription/user-ics-generator';
 import * as crypto from 'crypto';
 
 // Store previous timetable hashes to detect changes
@@ -292,6 +300,27 @@ async function createScheduleChangeNotificationForUser(
 const previousTimetableEntries: Map<string, UserTimetableEntry[]> = new Map();
 
 /**
+ * Update ICS file for a user with new timetable entries
+ */
+async function updateUserICSFile(userId: string, entries: UserTimetableEntry[]): Promise<void> {
+  try {
+    // Check if user has an ICS file (only update if they have one)
+    const hasICSFile = await userICSFileExists(userId);
+    
+    if (hasICSFile) {
+      // Regenerate ICS file with new timetable data
+      await generateUserICSFile(userId, entries);
+      console.log(`📅 Updated ICS file for user ${userId} with new timetable`);
+    } else {
+      console.log(`⏭️  Skipped ICS update for user ${userId} (no existing ICS file)`);
+    }
+  } catch (error) {
+    console.error(`❌ Error updating ICS file for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Compares timetables for all users and creates notifications for changes
  * This is the main function to be called by the cron job
  */
@@ -299,6 +328,7 @@ export async function compareTimetablesForAllUsers(): Promise<{
   usersChecked: number;
   usersWithChanges: number;
   notificationsCreated: number;
+  icsFilesUpdated: number;
   errors: string[];
 }> {
   console.log('🔄 Starting daily timetable comparison...');
@@ -307,6 +337,7 @@ export async function compareTimetablesForAllUsers(): Promise<{
     usersChecked: 0,
     usersWithChanges: 0,
     notificationsCreated: 0,
+    icsFilesUpdated: 0,
     errors: [] as string[],
   };
   
@@ -343,6 +374,10 @@ export async function compareTimetablesForAllUsers(): Promise<{
             // Create notification
             await createScheduleChangeNotificationForUser(userId, changes);
             result.notificationsCreated++;
+            
+            // Update ICS file if it exists
+            await updateUserICSFile(userId, currentEntries);
+            result.icsFilesUpdated++;
           }
           
           // Update stored data
@@ -361,6 +396,7 @@ export async function compareTimetablesForAllUsers(): Promise<{
     console.log(`   - Users checked: ${result.usersChecked}`);
     console.log(`   - Users with changes: ${result.usersWithChanges}`);
     console.log(`   - Notifications created: ${result.notificationsCreated}`);
+    console.log(`   - ICS files updated: ${result.icsFilesUpdated}`);
     
   } catch (error) {
     const errorMsg = `Fatal error in timetable comparison: ${error instanceof Error ? error.message : error}`;
@@ -401,6 +437,7 @@ export async function checkUserTimetableChanges(userId: string): Promise<{
   hasChanges: boolean;
   changes: TimetableChange[];
   lastChecked: string;
+  icsFileUpdated: boolean;
 }> {
   const timetable = await getUserTimetableDB(userId);
   
@@ -409,6 +446,7 @@ export async function checkUserTimetableChanges(userId: string): Promise<{
       hasChanges: false,
       changes: [],
       lastChecked: new Date().toISOString(),
+      icsFileUpdated: false,
     };
   }
   
@@ -426,6 +464,7 @@ export async function checkUserTimetableChanges(userId: string): Promise<{
       hasChanges: false,
       changes: [],
       lastChecked: new Date().toISOString(),
+      icsFileUpdated: false,
     };
   }
   
@@ -437,10 +476,22 @@ export async function checkUserTimetableChanges(userId: string): Promise<{
     previousTimetableHashes.set(userId, currentHash);
     previousTimetableEntries.set(userId, [...currentEntries]);
     
+    // Update ICS file if there are changes
+    let icsFileUpdated = false;
+    if (changes.length > 0) {
+      try {
+        await updateUserICSFile(userId, currentEntries);
+        icsFileUpdated = true;
+      } catch (error) {
+        console.error(`Failed to update ICS file for user ${userId}:`, error);
+      }
+    }
+    
     return {
       hasChanges: changes.length > 0,
       changes,
       lastChecked: new Date().toISOString(),
+      icsFileUpdated,
     };
   }
   
@@ -448,6 +499,7 @@ export async function checkUserTimetableChanges(userId: string): Promise<{
     hasChanges: false,
     changes: [],
     lastChecked: new Date().toISOString(),
+    icsFileUpdated: false,
   };
 }
 
