@@ -10,18 +10,18 @@ abstract class BaseProvider extends ChangeNotifier {
   bool? isTeacher;
   bool isLoading = false;
 
-  // Selection state
+  
   TeacherName? selectedTeacher;
   Field? selectedField;
   int? selectedYear;
 
-  // Cached lists
+  
   List<TeacherName> teachers = <TeacherName>[];
   List<Field> fields = <Field>[];
   List<Subject> subjects = <Subject>[];
   List<StudentTimeTable> fieldYearTimetables = <StudentTimeTable>[];
 
-  // Capability flags
+  
   bool get isPersonalizationEnabled;
 
   void setIsTeacher(bool value) {
@@ -34,7 +34,7 @@ abstract class BaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Flows
+  
   Future<void> loadTeachers();
   Future<void> selectTeacherAndLoadTimeTable(TeacherName teacher);
   Future<void> loadFields();
@@ -47,10 +47,11 @@ abstract class BaseProvider extends ChangeNotifier {
     required int year,
   });
 
-  // Mutations
+  
   void addEntry(TimeTableEntry entry);
   void removeEntry(int id);
   void updateEntry(TimeTableEntry entry);
   void addSubject(Subject subject);
   void importFromTimeTable(TimeTable timetable);
+  void clearAllEntries();
 }

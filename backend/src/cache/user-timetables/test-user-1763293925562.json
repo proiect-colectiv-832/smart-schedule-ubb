@@ -1,0 +1,62 @@
+{
+  "userId": "test-user-1763293925562",
+  "events": [
+    {
+      "title": "Web Technologies (Lecture)",
+      "startTime": "2025-11-17T06:00:00.000Z",
+      "endTime": "2025-11-17T08:00:00.000Z",
+      "location": "C310",
+      "description": "Teacher: Prof. John Smith\nGroup: MIE3\nType: Lecture",
+      "isRecurring": true,
+      "recurrenceRule": {
+        "frequency": "weekly",
+        "daysOfWeek": [
+          1
+        ],
+        "until": "2026-01-30T22:00:00.000Z"
+      },
+      "type": "lecture",
+      "color": "#3498db"
+    },
+    {
+      "title": "Web Technologies (Lab)",
+      "startTime": "2025-11-19T08:00:00.000Z",
+      "endTime": "2025-11-19T10:00:00.000Z",
+      "location": "Lab 320",
+      "description": "Teacher: Prof. Jane Doe\nGroup: 931/1\nType: Laboratory",
+      "isRecurring": true,
+      "recurrenceRule": {
+        "frequency": "oddweeks",
+        "daysOfWeek": [
+          3
+        ],
+        "until": "2026-01-30T22:00:00.000Z"
+      },
+      "type": "lab",
+      "color": "#e74c3c"
+    },
+    {
+      "title": "Project Meeting",
+      "startTime": "2025-11-24T06:00:00.000Z",
+      "endTime": "2025-11-24T08:00:00.000Z",
+      "location": "Online - Zoom",
+      "description": "Weekly team sync",
+      "isRecurring": false,
+      "type": "custom",
+      "color": "#2ecc71"
+    },
+    {
+      "id": "e6cb7bee-63ba-461f-9d80-522618dfeb44",
+      "title": "Exam Review Session",
+      "startTime": "2025-12-01T12:00:00.000Z",
+      "endTime": "2025-12-01T14:00:00.000Z",
+      "location": "Study Room A",
+      "description": "Final exam preparation",
+      "isRecurring": false,
+      "type": "custom"
+    }
+  ],
+  "lastModified": "2025-11-16T11:52:05.866Z",
+  "semesterStart": "2025-09-30T21:00:00.000Z",
+  "semesterEnd": "2026-01-30T22:00:00.000Z"
+}

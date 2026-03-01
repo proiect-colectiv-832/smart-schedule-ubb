@@ -19,12 +19,19 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Cache files
+# Cache data files (JSON) - ignore cache/ folder for data
 cache/
+# But allow source code in src/cache/
+!src/cache/
+!src/cache/**/*.ts
 *.cache
 
 # Data files (temporary/test)
 data/
+
+# ICS files generated for users
+ics-files-for-users/
+*.ics
 
 # OS
 .DS_Store
@@ -69,10 +76,3 @@ jspm_packages/
 # Push notification keys (sensitive)
 vapid-keys.json
 .node_repl_history
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-

@@ -17,6 +17,18 @@ class CustomTabScaffold extends StatefulWidget {
 
 class _CustomTabScaffoldState extends State<CustomTabScaffold> {
   int _currentIndex = 0;
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _navigatorKeys.addAll(
+      List.generate(
+        widget.items.length,
+        (index) => GlobalKey<NavigatorState>(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +37,19 @@ class _CustomTabScaffoldState extends State<CustomTabScaffold> {
         index: _currentIndex,
         children: List.generate(
           widget.items.length,
-          (index) => widget.tabBuilder(context, index),
+          (index) => Navigator(
+            key: _navigatorKeys[index],
+            onGenerateRoute: (settings) {
+              if (settings.name == '/' || settings.name == null) {
+                return MaterialPageRoute(
+                  builder: (context) => widget.tabBuilder(context, index),
+                );
+              }
+              
+              return null;
+            },
+            initialRoute: '/',
+          ),
         ),
       ),
       bottomNavigationBar: Container(

@@ -9,7 +9,7 @@ export {
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash
-} from './timetable-parser';
+} from './parsers/timetable-parser';
 
 export {
   Timetable,

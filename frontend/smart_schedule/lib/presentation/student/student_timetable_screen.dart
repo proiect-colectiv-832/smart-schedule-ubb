@@ -124,7 +124,7 @@ class _StudentTimeTableScreenState extends State<StudentTimeTableScreen> {
   }
 }
 
-// Timetable View Widget
+
 class _TimetableView extends StatelessWidget {
   final List<TimeTableEntry> entries;
   final BaseProvider provider;
@@ -617,7 +617,7 @@ class _StudentClassCard extends StatelessWidget {
   }
 }
 
-// Optional Lectures Panel
+
 class _OptionalLecturesPanel extends StatelessWidget {
   final List<Subject> subjects;
   final Set<int> selectedLectures;
@@ -631,7 +631,7 @@ class _OptionalLecturesPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mock optional lectures data
+    
     final optionalLectures = [
       _OptionalLecture(
         id: 1,
@@ -742,7 +742,7 @@ class _OptionalLecturesPanel extends StatelessWidget {
   }
 }
 
-// Selection Summary Widget
+
 class _SelectionSummary extends StatelessWidget {
   final int selected;
   final int total;
@@ -780,7 +780,7 @@ class _SelectionSummary extends StatelessWidget {
   }
 }
 
-// Optional Lecture Card
+
 class _OptionalLectureCard extends StatelessWidget {
   final _OptionalLecture lecture;
   final bool isSelected;
@@ -810,7 +810,7 @@ class _OptionalLectureCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Checkbox
+            
             Container(
               width: 24,
               height: 24,
@@ -835,7 +835,7 @@ class _OptionalLectureCard extends StatelessWidget {
                   : null,
             ),
             const SizedBox(width: 12),
-            // Lecture details
+            
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -908,7 +908,7 @@ class _OptionalLectureCard extends StatelessWidget {
   }
 }
 
-// Optional Lecture Model
+
 class _OptionalLecture {
   final int id;
   final String name;

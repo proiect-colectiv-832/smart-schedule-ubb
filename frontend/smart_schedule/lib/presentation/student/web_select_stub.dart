@@ -6,7 +6,7 @@ Widget buildWebFieldDropdown({
   required Field? value,
   required ValueChanged<Field?> onChanged,
 }) {
-  // Fallback for non-web platforms; should never be called.
+  
   return const SizedBox.shrink();
 }
 

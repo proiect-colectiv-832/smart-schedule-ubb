@@ -6,22 +6,78 @@ import 'package:smart_schedule/models/timetables.dart';
 import 'package:smart_schedule/presentation/app_scope.dart';
 import 'package:smart_schedule/utils/platform_service.dart';
 
-class TeacherTimeTableScreen extends StatelessWidget {
+class TeacherTimeTableScreen extends StatefulWidget {
   const TeacherTimeTableScreen({super.key});
+
+  @override
+  State<TeacherTimeTableScreen> createState() => _TeacherTimeTableScreenState();
+}
+
+class _TeacherTimeTableScreenState extends State<TeacherTimeTableScreen> {
+  List<TimeTableEntry> _teacherEntries = <TimeTableEntry>[];
+  String _teacherName = 'Teacher Timetable';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final BaseProvider provider = AppScope.of(context);
+      if (provider.selectedTeacher != null) {
+        setState(() {
+          _isLoading = true;
+        });
+        try {
+          final TeacherTimeTable tt = await provider.api.fetchTeacherTimeTable(
+            teacher: provider.selectedTeacher!,
+          );
+          
+          
+          setState(() {
+            _teacherEntries = tt.entries.map((entry) {
+              return TimeTableEntry(
+                id: entry.id,
+                day: entry.day,
+                interval: TimeInterval(
+                  start: entry.interval.start,
+                  end: entry.interval.end,
+                ),
+                subjectName: entry.subjectName,
+                teacher: TeacherName(name: entry.teacher.name),
+                frequency: entry.frequency,
+                type: entry.type,
+                room: entry.room,
+                format: entry.format,
+              );
+            }).toList();
+            _teacherName = tt.name.name;
+            _isLoading = false;
+          });
+        } catch (e) {
+          setState(() {
+            _teacherEntries = <TimeTableEntry>[];
+            _teacherName =
+                provider.selectedTeacher?.name ?? 'Teacher Timetable';
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final BaseProvider provider = AppScope.of(context);
-    final List<TimeTableEntry> entries =
-        provider.currentTimeTable?.entries ?? <TimeTableEntry>[];
-    final TeacherTimeTable? teacherTable =
-        provider.currentTimeTable is TeacherTimeTable
-        ? provider.currentTimeTable as TeacherTimeTable
-        : null;
-    final String teacherName =
-        teacherTable?.name.name ??
-        provider.selectedTeacher?.name ??
-        'Teacher Timetable';
+
+    
+    final List<TimeTableEntry> entries = _teacherEntries;
+    final String teacherName = _teacherName;
 
     final Widget content = CupertinoPageScaffold(
       navigationBar: null,
@@ -69,14 +125,46 @@ class TeacherTimeTableScreen extends StatelessWidget {
                           color: CupertinoColors.systemGrey.darkColor,
                         ),
                       ),
+                      
+                      if (PlatformService.isMobilePwa &&
+                          provider.isPersonalizationEnabled &&
+                          entries.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: CupertinoButton.filled(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            onPressed: () {
+                              
+                              final TimeTable timetable = TimeTable(
+                                entries: List<TimeTableEntry>.from(entries),
+                              );
+                              provider.importFromTimeTable(timetable);
+                            },
+                            child: const Text(
+                              'Set as My Timetable',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
-                sliver: _buildTimetableGrid(entries, provider),
-              ),
+              if (_isLoading)
+                const SliverFillRemaining(
+                  child: Center(child: CupertinoActivityIndicator()),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
+                  sliver: _buildTimetableGrid(entries, provider),
+                ),
             ],
           ),
         ),
@@ -93,14 +181,14 @@ class TeacherTimeTableScreen extends StatelessWidget {
     List<TimeTableEntry> entries,
     BaseProvider provider,
   ) {
-    // Group entries by day
+    
     final Map<Day, List<TimeTableEntry>> entriesByDay =
         <Day, List<TimeTableEntry>>{};
     for (final entry in entries) {
       entriesByDay.putIfAbsent(entry.day, () => <TimeTableEntry>[]).add(entry);
     }
 
-    // Sort each day's entries by time
+    
     for (final dayEntries in entriesByDay.values) {
       dayEntries.sort((a, b) {
         final aMinutes = a.interval.start.hour * 60 + a.interval.start.minute;
@@ -201,7 +289,7 @@ class TeacherTimeTableScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: _TeachingClassCard(
                       entry: entry,
-                      onDelete: null, // Teachers can only view, not delete
+                      onDelete: null, 
                     ),
                   ),
                 ),
@@ -232,7 +320,7 @@ class TeacherTimeTableScreen extends StatelessWidget {
   }
 }
 
-// Teaching Class Card Widget
+
 class _TeachingClassCard extends StatelessWidget {
   final TimeTableEntry entry;
   final VoidCallback? onDelete;
@@ -307,7 +395,7 @@ class _TeachingClassCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // Type icon
+                
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -317,7 +405,7 @@ class _TeachingClassCard extends StatelessWidget {
                   child: Icon(typeIcon, size: 24, color: typeColor),
                 ),
                 const SizedBox(width: 12),
-                // Subject name and type
+                
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +440,7 @@ class _TeachingClassCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Delete button
+                
                 if (onDelete != null)
                   CupertinoButton(
                     padding: EdgeInsets.zero,
@@ -366,13 +454,13 @@ class _TeachingClassCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Divider
+            
             Container(height: 1, color: CupertinoColors.separator),
             const SizedBox(height: 12),
-            // Time and location details
+            
             Row(
               children: [
-                // Time
+                
                 Expanded(
                   child: Row(
                     children: [
@@ -393,7 +481,7 @@ class _TeachingClassCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Location
+                
                 Row(
                   children: [
                     const Icon(
@@ -415,7 +503,7 @@ class _TeachingClassCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Format
+            
             Row(
               children: [
                 const Icon(
@@ -432,7 +520,7 @@ class _TeachingClassCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Frequency badge
+                
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,

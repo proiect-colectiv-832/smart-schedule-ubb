@@ -17,7 +17,7 @@
     "sourceMap": true,
     "removeComments": true
   },
-  "include": ["src/**/*", "*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": ["src/**/*", "*.ts", "server.ts", "index.ts", "types.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "tests", "test-output"]
 }
 

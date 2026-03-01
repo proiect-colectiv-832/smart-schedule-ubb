@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
-/// Creates a route for mobile PWA that disables swipe-to-go-back gesture
-/// Completely disables swipe gestures
+
+
 PageRoute<T> createMobileRoute<T>({
   required WidgetBuilder builder,
   bool fullscreenDialog = false,
@@ -22,7 +22,7 @@ class _NoSwipePageRoute<T> extends CupertinoPageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    // Completely disable swipe gestures - no transitions
+    
     return child;
   }
 

@@ -1,13 +1,15 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as http from 'http';
+import cron from 'node-cron';
 import {
   parseTimetable,
   parseTimetablesByGroup,
   parseMultipleTimetables,
   exportToJson,
   createTimetableHash,
-} from './src/timetable-parser';
+} from './src/parsers/timetable-parser';
 import { Timetable, TimetableEntry } from './src/types';
 import {
   initializeCache,
@@ -17,7 +19,7 @@ import {
   getSubject,
   searchSubjects,
   getCacheStats
-} from './src/cache-manager';
+} from './src/cache/cache-manager';
 import {
   createNotification,
   getNotifications,
@@ -28,9 +30,67 @@ import {
   getNotificationStats,
   createScheduleChangeNotification,
   cleanupExpiredNotifications
-} from './src/notification-manager';
-import { NotificationType, NotificationPriority } from './src/notification-types';
-import { PushNotificationManager } from './src/push-notification-manager';
+} from './src/notifications/notification-manager';
+import { NotificationType, NotificationPriority } from './src/notifications/notification-types';
+import { PushNotificationManager } from './src/notifications/push-notification-manager';
+import {
+  initializeTokenManager,
+  generateCalendarToken,
+  getUserIdFromToken,
+  revokeCalendarToken,
+  revokeUserTokens,
+  getUserTokens,
+  getTokenStats
+} from './src/calendar-subscription/calendar-token-manager';
+import {
+  initializeUserTimetableManager,
+  getUserTimetable,
+  saveUserTimetable,
+  addUserEvent,
+  updateUserEvent,
+  deleteUserEvent,
+  deleteUserTimetable,
+  getUserTimetableStats,
+  UserEvent
+} from './src/calendar-subscription/user-timetable-manager';
+import {
+  generateICalendar,
+  generateICalendarForDateRange,
+  validateICalendar,
+  getCalendarMetadata
+} from './src/calendar-subscription/icalendar-generator';
+import {
+  convertTimetableEntriesToEvents,
+  getDefaultSemesterDates
+} from './src/calendar-subscription/timetable-to-events-converter';
+import {
+  initializeMongoDB,
+  getDatabase,
+  closeMongoDBConnection,
+  isConnected
+} from './src/database';
+import {
+  saveUserTimetable as saveUserTimetableDB,
+  getUserTimetable as getUserTimetableDB,
+  deleteUserTimetable as deleteUserTimetableDB,
+  getUserTimetableStats as getUserTimetableStatsDB,
+  createUserTimetableIndexes,
+  UserTimetableEntry
+} from './src/database/user-timetable-db';
+import {
+  initializeICSDirectory,
+  generateUserICSFile,
+  getUserICSFilePath,
+  userICSFileExists,
+  deleteUserICSFile,
+  getAllICSFiles
+} from './src/calendar-subscription/user-ics-generator';
+import {
+  compareTimetablesForAllUsers,
+  initializeTimetableComparison,
+  checkUserTimetableChanges,
+  getTimetableComparisonStats
+} from './src/jobs/timetable-comparison-job';
 
 const app = express();
 const server = http.createServer(app);
@@ -117,7 +177,7 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
     frequency,
     type,
     room: entry.room || '',
-    format: entry.group || ''  // MIE3, 832, 831/1, etc. - valoarea din coloana Formatia
+    format: entry.group || ''  
   };
 }
 
@@ -164,6 +224,29 @@ app.get('/', (req: Request, res: Response) => {
       'GET /push/stats': 'Get push notification statistics',
       'POST /push/send': 'Send push notification to specific users',
       'POST /push/broadcast': 'Broadcast notification to all users',
+      'POST /calendar/generate-token': 'Generate calendar subscription token',
+      'GET /calendar/token/:token': 'Get user ID from calendar token',
+      'DELETE /calendar/token/:token': 'Revoke calendar token',
+      'POST /calendar/revoke': 'Revoke all tokens for a user',
+      'GET /calendar/tokens': 'Get all tokens for a user',
+      'GET /calendar/token-stats': 'Get statistics about calendar tokens',
+      'POST /timetable/user': 'Save or update user timetable',
+      'GET /timetable/user': 'Get user timetable',
+      'DELETE /timetable/user': 'Delete user timetable',
+      'POST /timetable/event': 'Add or update user event',
+      'DELETE /timetable/event': 'Delete user event',
+      'GET /timetable/stats': 'Get user timetable statistics',
+      'POST /user-timetable': 'Save/update user timetable (mobile app) - Generates ICS file',
+      'GET /user-timetable': 'Get user timetable from MongoDB (mobile app)',
+      'DELETE /user-timetable': 'Delete user timetable from MongoDB (mobile app) - Deletes ICS file',
+      'GET /user-timetable/stats': 'Get user timetable statistics from MongoDB',
+      'GET /icsfilesforusers': 'List all ICS files',
+      'GET /icsfilesforusers/:userId.ics': 'Download ICS file for specific user',
+      'POST /icsfilesforusers/:userId/regenerate': 'Regenerate ICS file for specific user',
+      'GET /icalendar/generate': 'Generate iCalendar file',
+      'GET /icalendar/validate': 'Validate iCalendar file',
+      'GET /icalendar/metadata': 'Get metadata from iCalendar file',
+      'GET /timetable/events/default-dates': 'Get default semester dates for events',
     },
     exampleUsage: {
       teachers: 'GET /teachers',
@@ -177,12 +260,72 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', async (req: Request, res: Response) => {
+  const mongoStatus = process.env.MONGODB_URI ? await isConnected() : null;
+  
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    services: {
+      mongodb: mongoStatus !== null ? (mongoStatus ? 'connected' : 'disconnected') : 'not configured',
+    },
   });
+});
+
+// MongoDB connection status endpoint
+app.get('/mongodb/status', async (req: Request, res: Response) => {
+  try {
+    const hasUri = !!process.env.MONGODB_URI;
+    const connected = hasUri ? await isConnected() : false;
+    const db = getDatabase();
+    
+    let details: any = {
+      configured: hasUri,
+      connected,
+      databaseName: process.env.MONGODB_DB_NAME || 'smart-schedule',
+    };
+
+    if (hasUri) {
+      if (connected && db) {
+        // Try to get some database stats
+        try {
+          const adminDb = db.admin();
+          const serverStatus = await adminDb.serverStatus();
+          details.serverInfo = {
+            version: serverStatus.version,
+            host: serverStatus.host,
+            uptime: serverStatus.uptime,
+          };
+          
+          // List collections to verify we can access the database
+          const collections = await db.listCollections().toArray();
+          details.collections = collections.map((c: any) => c.name);
+          details.collectionCount = collections.length;
+        } catch (error) {
+          details.error = error instanceof Error ? error.message : 'Unknown error';
+        }
+      } else {
+        details.error = 'Not connected to MongoDB';
+        details.connectionString = process.env.MONGODB_URI 
+          ? process.env.MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') // Hide credentials
+          : 'Not set';
+      }
+    } else {
+      details.message = 'MONGODB_URI environment variable is not set';
+    }
+
+    res.json({
+      success: true,
+      data: details,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check MongoDB status',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
 });
 
 // Get cache statistics
@@ -230,7 +373,7 @@ app.get('/fields', async (req: Request, res: Response) => {
     const fields = await getAllFields();
 
     // Return array of fields with id, name, and years
-    const fieldsData = fields.map((field, index) => ({
+    const fieldsData = fields.map((field: { name: string; years: number[] }, index: number) => ({
       id: index + 1,
       name: field.name,
       years: field.years,
@@ -283,12 +426,13 @@ app.get('/subjects', async (req: Request, res: Response) => {
   try {
     const subjects = await getAllSubjects();
 
-    // Transform subjects to match frontend format
-    const subjectsData = subjects.map((subject, index) => ({
-      id: index + 1,
+    // Transform subjects to match frontend format with code as id
+    let globalEntryId = 1;
+    const subjectsData = subjects.map((subject: { name: string; code: string; timetableEntries: TimetableEntry[] }) => ({
+      id: subject.code || `unknown-${subject.name.replace(/\s+/g, '-')}`, // Use code as id, fallback to sanitized name
       name: subject.name,
-      entries: subject.timetableEntries.map((entry, entryIndex) =>
-        transformTimetableEntry(entry, (index + 1) * 1000 + entryIndex)
+      entries: subject.timetableEntries.map((entry: TimetableEntry) =>
+        transformTimetableEntry(entry, globalEntryId++)
       )
     }));
 
@@ -353,7 +497,7 @@ app.get('/subjects/search', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        subjects: results.map(subject => ({
+        subjects: results.map((subject: { name: string; code: string; timetableEntries: TimetableEntry[] }) => ({
           name: subject.name,
           code: subject.code,
           entriesCount: subject.timetableEntries.length,
@@ -372,31 +516,6 @@ app.get('/subjects/search', async (req: Request, res: Response) => {
   }
 });
 
-// Get all subjects - matches frontend API spec
-app.get('/subjects', async (req: Request, res: Response) => {
-  try {
-    const subjects = await getAllSubjects();
-
-    // Transform to frontend format with entries
-    let globalEntryId = 1;
-    const subjectsData = subjects.map((subject, index) => ({
-      id: index + 1,
-      name: subject.name,
-      entries: subject.timetableEntries.map(entry =>
-        transformTimetableEntry(entry, globalEntryId++)
-      )
-    }));
-
-    res.json(subjectsData);
-  } catch (error: any) {
-    console.error('Error loading subjects:', error);
-    res.status(500).json({
-      error: 'Failed to load subjects',
-      message: error.message || 'Unknown error occurred',
-    });
-  }
-});
-
 // Get all teachers - matches frontend API spec
 app.get('/teachers', async (req: Request, res: Response) => {
   try {
@@ -404,8 +523,8 @@ app.get('/teachers', async (req: Request, res: Response) => {
 
     // Extract unique teacher names from all subjects
     const teacherSet = new Set<string>();
-    subjects.forEach(subject => {
-      subject.timetableEntries.forEach(entry => {
+    subjects.forEach((subject: { name: string; code: string; timetableEntries: TimetableEntry[] }) => {
+      subject.timetableEntries.forEach((entry: TimetableEntry) => {
         if (entry.teacher && entry.teacher.trim() !== '') {
           teacherSet.add(entry.teacher.trim());
         }
@@ -437,8 +556,8 @@ app.get('/teacher/:teacherName/timetable', async (req: Request, res: Response) =
     const teacherEntries: any[] = [];
     let entryId = 1;
 
-    subjects.forEach(subject => {
-      subject.timetableEntries.forEach(entry => {
+    subjects.forEach((subject: { timetableEntries: TimetableEntry[] }) => {
+      subject.timetableEntries.forEach((entry: TimetableEntry) => {
         if (entry.teacher && entry.teacher.trim() === teacherName) {
           teacherEntries.push(transformTimetableEntry(entry, entryId++));
         }
@@ -547,7 +666,7 @@ app.get('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({
         error: 'Missing or invalid URL parameter',
         message: 'Please provide a valid URL as a query parameter: ?url=<timetable_url>',
-        example: '/parse?url=https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html',
+        example: '/parse?url=https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar/MIE3.html',
       });
     }
 
@@ -661,8 +780,8 @@ app.get('/example-urls', (req: Request, res: Response) => {
     baseUrl: 'https://www.cs.ubbcluj.ro/files/orar/',
     urlPattern: '{baseUrl}{YEAR}-{SEMESTER}/tabelar/{SPECIALIZATION}{YEAR_OF_STUDY}.html',
     examples: {
-      'MIE Year 3, Semester 1, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/MIE3.html',
-      'CTI Year 1, Semester 1, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-1/tabelar/CTI1.html',
+      'MIE Year 3, Semester 2, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar/MIE3.html',
+      'CTI Year 1, Semester 2, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar/CTI1.html',
       'INFO Year 4, Semester 2, 2024': 'https://www.cs.ubbcluj.ro/files/orar/2024-2/tabelar/INFO4.html',
     },
     specializations: ['MIE', 'CTI', 'INFO', 'MI'],
@@ -952,6 +1071,77 @@ app.post('/notifications/schedule-change', async (req: Request, res: Response) =
   }
 });
 
+// === TIMETABLE COMPARISON ENDPOINTS ===
+
+// Check for timetable changes for a specific user (called when user opens app)
+app.get('/timetable/check-changes', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId query parameter is required',
+      });
+    }
+
+    const result = await checkUserTimetableChanges(userId as string);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Error checking timetable changes:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check timetable changes',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get timetable comparison statistics
+app.get('/timetable/comparison-stats', async (req: Request, res: Response) => {
+  try {
+    const stats = getTimetableComparisonStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error: any) {
+    console.error('Error getting comparison stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get comparison stats',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Manually trigger timetable comparison (for testing/admin)
+app.post('/timetable/run-comparison', async (req: Request, res: Response) => {
+  try {
+    console.log('📢 Manual timetable comparison triggered');
+    const result = await compareTimetablesForAllUsers();
+
+    res.json({
+      success: true,
+      message: 'Timetable comparison completed',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Error running timetable comparison:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to run timetable comparison',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
 // === PUSH NOTIFICATION ENDPOINTS ===
 
 // Get VAPID public key for web push subscriptions
@@ -1174,6 +1364,1020 @@ app.post('/push/broadcast', async (req: Request, res: Response) => {
 
 // === END PUSH NOTIFICATION ENDPOINTS ===
 
+// ============== CALENDAR SUBSCRIPTION ENDPOINTS ==============
+
+// Generate calendar subscription token for a user
+app.post('/calendar/generate-token', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const token = await generateCalendarToken(userId);
+    const subscriptionUrl = `${req.protocol}://${req.get('host')}/calendar/${token}.ics`;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        token,
+        subscriptionUrl,
+        usage: {
+          appleCalendar: 'Open Calendar app → File → New Calendar Subscription → paste URL',
+          googleCalendar: 'Open Google Calendar → Other calendars (+) → From URL → paste URL',
+          outlook: 'Open Outlook → Add Calendar → Subscribe from web → paste URL',
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('Error generating calendar token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate calendar token',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user ID from calendar token (for debugging)
+app.get('/calendar/token/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const userId = await getUserIdFromToken(token);
+
+    if (!userId) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invalid token',
+        message: 'Token not found or expired',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { userId }
+    });
+  } catch (error: any) {
+    console.error('Error getting user from token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user from token',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Revoke a calendar token
+app.delete('/calendar/token/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const revoked = await revokeCalendarToken(token);
+
+    if (!revoked) {
+      return res.status(404).json({
+        success: false,
+        error: 'Token not found',
+        message: 'No token found with the provided value',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Calendar token revoked successfully'
+    });
+  } catch (error: any) {
+    console.error('Error revoking calendar token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to revoke calendar token',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Revoke all tokens for a user
+app.post('/calendar/revoke', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const count = await revokeUserTokens(userId);
+
+    res.json({
+      success: true,
+      message: `Revoked ${count} tokens for user`,
+      data: { revokedCount: count }
+    });
+  } catch (error: any) {
+    console.error('Error revoking user tokens:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to revoke user tokens',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get all tokens for a user
+app.get('/calendar/tokens', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const tokens = getUserTokens(userId as string);
+
+    res.json({
+      success: true,
+      data: { tokens }
+    });
+  } catch (error: any) {
+    console.error('Error getting user tokens:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user tokens',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get calendar token statistics
+app.get('/calendar/token-stats', async (req: Request, res: Response) => {
+  try {
+    const stats = getTokenStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    console.error('Error getting token stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get token statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== USER TIMETABLE MANAGEMENT ENDPOINTS ==============
+
+// Save or update user's timetable
+app.post('/timetable/user', async (req: Request, res: Response) => {
+  try {
+    const { userId, events, semesterStart, semesterEnd } = req.body;
+
+    if (!userId || !events) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and events are required',
+      });
+    }
+
+    const parsedSemesterStart = semesterStart ? new Date(semesterStart) : undefined;
+    const parsedSemesterEnd = semesterEnd ? new Date(semesterEnd) : undefined;
+
+    // Parse date strings in events
+    const parsedEvents = events.map((event: any) => ({
+      ...event,
+      startTime: new Date(event.startTime),
+      endTime: new Date(event.endTime),
+      recurrenceRule: event.recurrenceRule ? {
+        ...event.recurrenceRule,
+        until: event.recurrenceRule.until ? new Date(event.recurrenceRule.until) : undefined,
+      } : undefined,
+    }));
+
+    const timetable = await saveUserTimetable(userId, parsedEvents, parsedSemesterStart, parsedSemesterEnd);
+
+    res.json({
+      success: true,
+      data: timetable,
+      message: 'Timetable saved successfully'
+    });
+  } catch (error: any) {
+    console.error('Error saving user timetable:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user's timetable
+app.get('/timetable/user', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const timetable = await getUserTimetable(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: timetable
+    });
+  } catch (error: any) {
+    console.error('Error getting user timetable:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete user's timetable
+app.delete('/timetable/user', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    const deleted = await deleteUserTimetable(userId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Timetable deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting user timetable:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Add or update a user event
+app.post('/timetable/event', async (req: Request, res: Response) => {
+  try {
+    const { userId, event } = req.body;
+
+    if (!userId || !event) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and event are required',
+      });
+    }
+
+    // Parse dates
+    const parsedEvent = {
+      ...event,
+      startTime: new Date(event.startTime),
+      endTime: new Date(event.endTime),
+      recurrenceRule: event.recurrenceRule ? {
+        ...event.recurrenceRule,
+        until: event.recurrenceRule.until ? new Date(event.recurrenceRule.until) : undefined,
+      } : undefined,
+    };
+
+    let result: UserEvent | null;
+
+    if (event.id) {
+      // Update existing event
+      result = await updateUserEvent(userId, event.id, parsedEvent);
+    } else {
+      // Add new event
+      result = await addUserEvent(userId, parsedEvent);
+    }
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Event not found',
+        message: 'Could not update event - event or user not found',
+      });
+    }
+
+    res.status(event.id ? 200 : 201).json({
+      success: true,
+      data: result,
+      message: event.id ? 'Event updated successfully' : 'Event added successfully'
+    });
+  } catch (error: any) {
+    console.error('Error saving user event:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save user event',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete a user event
+app.delete('/timetable/event', async (req: Request, res: Response) => {
+  try {
+    const { userId, eventId } = req.body;
+
+    if (!userId || !eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'userId and eventId are required',
+      });
+    }
+
+    const deleted = await deleteUserEvent(userId, eventId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Event not found',
+        message: 'Could not delete event - event or user not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Event deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting user event:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete user event',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user timetable statistics
+app.get('/timetable/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = getUserTimetableStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    console.error('Error getting timetable stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get timetable statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== USER TIMETABLE SYNC ENDPOINT (MongoDB) ==============
+
+// Save/update user timetable from mobile app
+app.post('/user-timetable', async (req: Request, res: Response) => {
+  try {
+    const { userId, entries } = req.body;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    if (!entries || !Array.isArray(entries)) {
+      return res.status(401).json({
+        hasErrors: true,
+        error: 'Missing or invalid entries',
+        message: 'entries must be an array',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(500).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    // Validate each entry has the required structure matching frontend format
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      
+      // Check top-level required fields
+      const requiredFields = ['id', 'day', 'interval', 'subjectName', 'teacher', 'frequency', 'type', 'room', 'format'];
+      
+      for (const field of requiredFields) {
+        if (entry[field] === undefined || entry[field] === null) {
+          return res.status(402).json({
+            hasErrors: true,
+            error: 'Invalid entry format',
+            message: `Entry at index ${i} is missing required field: ${field}`,
+          });
+        }
+      }
+      
+      // Validate interval structure
+      if (!entry.interval.start || !entry.interval.end) {
+        return res.status(402).json({
+          hasErrors: true,
+          error: 'Invalid interval format',
+          message: `Entry at index ${i} has invalid interval structure. Expected interval.start and interval.end`,
+        });
+      }
+      
+      // Validate interval.start
+      if (typeof entry.interval.start.hour !== 'number' || typeof entry.interval.start.minute !== 'number') {
+        return res.status(402).json({
+          hasErrors: true,
+          error: 'Invalid interval.start format',
+          message: `Entry at index ${i} has invalid interval.start. Expected hour and minute as numbers`,
+        });
+      }
+      
+      // Validate interval.end
+      if (typeof entry.interval.end.hour !== 'number' || typeof entry.interval.end.minute !== 'number') {
+        return res.status(402).json({
+          hasErrors: true,
+          error: 'Invalid interval.end format',
+          message: `Entry at index ${i} has invalid interval.end. Expected hour and minute as numbers`,
+        });
+      }
+    }
+
+    // Save the timetable to MongoDB
+    const savedTimetable = await saveUserTimetableDB(userId, entries as UserTimetableEntry[]);
+
+    // Generate ICS file for the user
+    try {
+      const icsFilePath = await generateUserICSFile(userId, entries as UserTimetableEntry[], {
+        language: 'ro-en',
+        excludeVacations: true,
+        includeFreeDaysAsEvents: true,
+        includeVacationsAsEvents: false,
+      });
+      console.log(`📅 Generated ICS file for user ${userId}: ${icsFilePath}`);
+    } catch (icsError) {
+      console.error(`Warning: Failed to generate ICS file for user ${userId}:`, icsError);
+      // Don't fail the request if ICS generation fails
+    }
+
+    res.status(200).json({
+      hasErrors: false,
+      success: true,
+      message: 'Timetable saved successfully',
+      data: {
+        userId: savedTimetable.userId,
+        entriesCount: savedTimetable.entries.length,
+        updatedAt: savedTimetable.updatedAt,
+        icsFileUrl: `/icsfilesforusers/${userId}.ics`,
+      },
+    });
+
+    console.log(`✅ Saved timetable for user ${userId} (${entries.length} entries)`);
+  } catch (error: any) {
+    console.error('Error saving user timetable:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to save user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user timetable from MongoDB
+app.get('/user-timetable', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    const timetable = await getUserTimetableDB(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        hasErrors: true,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      data: {
+        userId: timetable.userId,
+        entries: timetable.entries,
+        createdAt: timetable.createdAt,
+        updatedAt: timetable.updatedAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error getting user timetable:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to get user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Delete user timetable from MongoDB
+app.delete('/user-timetable', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required in the request body',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    const deleted = await deleteUserTimetableDB(userId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        hasErrors: true,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    // Also delete the ICS file if it exists
+    try {
+      await deleteUserICSFile(userId);
+    } catch (icsError) {
+      console.error(`Warning: Failed to delete ICS file for user ${userId}:`, icsError);
+    }
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      message: 'Timetable deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Error deleting user timetable:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to delete user timetable',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get user timetable statistics from MongoDB
+app.get('/user-timetable/stats', async (req: Request, res: Response) => {
+  try {
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    const stats = await getUserTimetableStatsDB();
+    res.json({
+      hasErrors: false,
+      success: true,
+      data: stats,
+    });
+  } catch (error: any) {
+    console.error('Error getting user timetable stats:', error);
+    res.status(500).json({
+      hasErrors: true,
+      success: false,
+      error: 'Failed to get user timetable statistics',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== ICS FILES FOR USERS ENDPOINTS ==============
+
+// Get ICS file for a specific user
+app.get('/icsfilesforusers/:userId.ics', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).send('Missing userId parameter');
+    }
+
+    // Check if ICS file exists
+    const exists = await userICSFileExists(userId);
+    if (!exists) {
+      return res.status(404).send('ICS file not found for this user. Please save a timetable first.');
+    }
+
+    // Get file path
+    const filePath = getUserICSFilePath(userId);
+
+    // Set proper headers for ICS file
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${userId}.ics"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    // Send file
+    res.sendFile(filePath);
+
+    console.log(`📅 Served ICS file for user ${userId}`);
+  } catch (error: any) {
+    console.error('Error serving ICS file:', error);
+    res.status(500).send('Error serving ICS file. Please try again later.');
+  }
+});
+
+// Get list of all ICS files (for debugging/admin)
+app.get('/icsfilesforusers', async (req: Request, res: Response) => {
+  try {
+    const files = await getAllICSFiles();
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      data: {
+        totalFiles: files.length,
+        files: files.map(f => ({
+          filename: f,
+          userId: f.replace('.ics', ''),
+          url: `/icsfilesforusers/${f}`
+        }))
+      }
+    });
+
+    console.log(`📋 Listed ${files.length} ICS files`);
+  } catch (error: any) {
+    console.error('Error listing ICS files:', error);
+    res.status(500).json({
+      hasErrors: true,
+      error: 'Failed to list ICS files',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Regenerate ICS file for a specific user (useful for manual refresh)
+app.post('/icsfilesforusers/:userId/regenerate', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        hasErrors: true,
+        error: 'Missing userId',
+        message: 'userId is required',
+      });
+    }
+
+    // Check if MongoDB is connected
+    const connected = await isConnected();
+    if (!connected) {
+      return res.status(503).json({
+        hasErrors: true,
+        error: 'Database unavailable',
+        message: 'MongoDB is not connected. Please try again later.',
+      });
+    }
+
+    // Get user timetable from MongoDB
+    const timetable = await getUserTimetableDB(userId);
+
+    if (!timetable) {
+      return res.status(404).json({
+        hasErrors: true,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    // Regenerate ICS file
+    const icsFilePath = await generateUserICSFile(userId, timetable.entries, {
+      language: 'ro-en',
+      excludeVacations: true,
+      includeFreeDaysAsEvents: true,
+      includeVacationsAsEvents: false,
+    });
+
+    res.json({
+      hasErrors: false,
+      success: true,
+      message: 'ICS file regenerated successfully',
+      data: {
+        userId,
+        icsFileUrl: `/icsfilesforusers/${userId}.ics`,
+        filePath: icsFilePath,
+      }
+    });
+
+    console.log(`♻️  Regenerated ICS file for user ${userId}`);
+  } catch (error: any) {
+    console.error('Error regenerating ICS file:', error);
+    res.status(500).json({
+      hasErrors: true,
+      error: 'Failed to regenerate ICS file',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// ============== ICALENDAR GENERATION ENDPOINTS ==============
+
+// Serve iCalendar feed for a user (the main subscription endpoint)
+app.get('/calendar/:token.ics', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const {
+      language = 'ro-en',
+      isTerminalYear = 'false',
+      includeVacations = 'true',
+      includeExamPeriods = 'true'
+    } = req.query;
+
+    // Validate token and get user ID
+    const userId = await getUserIdFromToken(token);
+
+    if (!userId) {
+      return res.status(404).send('Calendar not found. The subscription link may be invalid or expired.');
+    }
+
+    // Get user's timetable
+    const timetable = await getUserTimetable(userId);
+
+    if (!timetable || timetable.events.length === 0) {
+      return res.status(404).send('No events found in your timetable. Please add some events first.');
+    }
+
+    // Generate iCalendar feed with academic calendar integration
+    const icalString = await generateICalendar(timetable, userId, {
+      language: language as 'ro-en' | 'hu-de',
+      isTerminalYear: isTerminalYear === 'true',
+      includeVacations: includeVacations === 'true',
+      includeExamPeriods: includeExamPeriods === 'true'
+    });
+
+    // Set proper headers for calendar subscription
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline; filename="calendar.ics"');
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
+    res.setHeader('X-WR-CALNAME', 'UBB Smart Schedule');
+    res.setHeader('X-WR-CALDESC', 'Your personalized UBB timetable');
+
+    res.send(icalString);
+
+    console.log(`📅 Served calendar for user ${userId} (${timetable.events.length} events, lang: ${language}, terminal: ${isTerminalYear})`);
+  } catch (error: any) {
+    console.error('Error serving iCalendar:', error);
+    res.status(500).send('Error generating calendar. Please try again later.');
+  }
+});
+
+// Generate iCalendar for testing/preview (requires userId)
+app.get('/icalendar/generate', async (req: Request, res: Response) => {
+  try {
+    const {
+      userId,
+      startDate,
+      endDate,
+      format,
+      language = 'ro-en',
+      isTerminalYear = 'false',
+      includeVacations = 'true',
+      includeExamPeriods = 'true'
+    } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const timetable = await getUserTimetable(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    const options = {
+      language: language as 'ro-en' | 'hu-de',
+      isTerminalYear: isTerminalYear === 'true',
+      includeVacations: includeVacations === 'true',
+      includeExamPeriods: includeExamPeriods === 'true'
+    };
+
+    let icalString: string;
+
+    if (startDate && endDate) {
+      icalString = await generateICalendarForDateRange(
+        timetable,
+        userId as string,
+        new Date(startDate as string),
+        new Date(endDate as string),
+        options
+      );
+    } else {
+      icalString = await generateICalendar(timetable, userId as string, options);
+    }
+
+    if (format === 'json') {
+      // Return as JSON for debugging
+      res.json({
+        success: true,
+        data: {
+          icalendar: icalString,
+          metadata: getCalendarMetadata(timetable),
+          options: options
+        }
+      });
+    } else {
+      // Return as .ics file
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="timetable.ics"');
+      res.send(icalString);
+    }
+  } catch (error: any) {
+    console.error('Error generating iCalendar:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate iCalendar',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Validate an iCalendar string
+app.post('/icalendar/validate', async (req: Request, res: Response) => {
+  try {
+    const { icalendar } = req.body;
+
+    if (!icalendar) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing iCalendar data',
+        message: 'icalendar string is required in the request body',
+      });
+    }
+
+    const validation = validateICalendar(icalendar);
+
+    res.json({
+      success: true,
+      data: validation
+    });
+  } catch (error: any) {
+    console.error('Error validating iCalendar:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to validate iCalendar',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get calendar metadata for a user
+app.get('/icalendar/metadata', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+        message: 'userId is required as query parameter',
+      });
+    }
+
+    const timetable = await getUserTimetable(userId as string);
+
+    if (!timetable) {
+      return res.status(404).json({
+        success: false,
+        error: 'Timetable not found',
+        message: `No timetable found for user: ${userId}`,
+      });
+    }
+
+    const metadata = getCalendarMetadata(timetable);
+
+    res.json({
+      success: true,
+      data: metadata
+    });
+  } catch (error: any) {
+    console.error('Error getting calendar metadata:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get calendar metadata',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// Get default semester dates
+app.get('/timetable/events/default-dates', async (req: Request, res: Response) => {
+  try {
+    const dates = getDefaultSemesterDates();
+    res.json({
+      success: true,
+      data: dates
+    });
+  } catch (error: any) {
+    console.error('Error getting default dates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get default semester dates',
+      message: error.message || 'Unknown error occurred',
+    });
+  }
+});
+
+// === END CALENDAR ENDPOINTS ===
+
+
 // Create hash for a timetable
 app.post('/hash', async (req: Request, res: Response) => {
   try {
@@ -1262,6 +2466,25 @@ async function startServer() {
   console.log('🎓 UBB Timetable Parser API');
   console.log('='.repeat(60));
 
+  // Initialize MongoDB connection
+  if (process.env.MONGODB_URI) {
+    try {
+      await initializeMongoDB();
+      
+      // Create indexes for user timetables
+      try {
+        await createUserTimetableIndexes();
+      } catch (error) {
+        console.error('⚠️  Warning: Failed to create user timetable indexes');
+        console.error('   Error:', error instanceof Error ? error.message : error);
+      }
+    } catch (error) {
+      console.error('⚠️  Warning: Failed to connect to MongoDB');
+      console.error('   MongoDB connection is optional. Server will continue without it.');
+      console.error('   Error:', error instanceof Error ? error.message : error);
+    }
+  }
+
   // Initialize cache at startup
   try {
     await initializeCache();
@@ -1271,9 +2494,59 @@ async function startServer() {
     console.error('   Error:', error instanceof Error ? error.message : error);
   }
 
+  // Initialize calendar token manager
+  try {
+    await initializeTokenManager();
+    console.log('🔐 Calendar token manager initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize calendar token manager');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
+  // Initialize user timetable manager
+  try {
+    await initializeUserTimetableManager();
+    console.log('📅 User timetable manager initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize user timetable manager');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
+  // Initialize ICS files directory
+  try {
+    await initializeICSDirectory();
+    console.log('📁 ICS files directory initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize ICS files directory');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
   // Initialize push notification manager
   pushManager = new PushNotificationManager(server);
   console.log('📱 Push notification manager initialized');
+
+  // Initialize timetable comparison baseline (for change detection)
+  try {
+    await initializeTimetableComparison();
+    console.log('🔄 Timetable comparison initialized');
+  } catch (error) {
+    console.error('⚠️  Warning: Failed to initialize timetable comparison');
+    console.error('   Error:', error instanceof Error ? error.message : error);
+  }
+
+  // Set up daily cron job for timetable comparison (runs at 6:00 AM every day)
+  cron.schedule('0 6 * * *', async () => {
+    console.log('⏰ Running scheduled timetable comparison...');
+    try {
+      const result = await compareTimetablesForAllUsers();
+      console.log(`📊 Scheduled comparison result: ${result.usersWithChanges}/${result.usersChecked} users had changes`);
+    } catch (error) {
+      console.error('Error during scheduled timetable comparison:', error);
+    }
+  }, {
+    timezone: 'Europe/Bucharest' // Romanian timezone
+  });
+  console.log('⏰ Daily timetable comparison scheduled for 6:00 AM');
 
   server.listen(PORT, () => {
     console.log('='.repeat(60));
@@ -1286,6 +2559,7 @@ async function startServer() {
     console.log(`📢 Notifications: http://localhost:${PORT}/notifications`);
     console.log(`📱 Push Notifications: WebSocket + Web Push enabled`);
     console.log(`🔑 VAPID Public Key: http://localhost:${PORT}/push/vapid-public-key`);
+    console.log(`📅 Calendar Subscriptions: http://localhost:${PORT}/calendar/{token}.ics`);
     console.log('='.repeat(60));
     
     // Set up periodic cleanup of expired notifications (every hour)
@@ -1298,6 +2572,35 @@ async function startServer() {
     }, 60 * 60 * 1000); // 1 hour
   });
 }
+
+// Graceful shutdown handler
+async function gracefulShutdown(signal: string) {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  try {
+    // Close MongoDB connection
+    await closeMongoDBConnection();
+    
+    // Close HTTP server
+    server.close(() => {
+      console.log('✅ Server closed successfully');
+      process.exit(0);
+    });
+    
+    // Force close after 10 seconds
+    setTimeout(() => {
+      console.error('⚠️  Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start the server
 startServer().catch((error) => {

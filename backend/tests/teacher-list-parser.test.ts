@@ -5,7 +5,7 @@ import {
   searchTeachersByName,
   groupTeachersByTitle,
   TeacherInfo,
-} from '../src/teacher-list-parser';
+} from '../src/parsers/teacher-list-parser';
 
 // Mock axios
 jest.mock('axios');
