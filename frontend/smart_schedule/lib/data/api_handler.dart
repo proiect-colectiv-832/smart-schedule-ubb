@@ -301,6 +301,7 @@ class ApiHandler {
   Future<void> postUserTimetable({
     required String userId,
     required List<TimeTableEntry> entries,
+    bool isTerminalYear = false,
   }) async {
     try {
       final response = await http.post(
@@ -309,6 +310,7 @@ class ApiHandler {
         body: jsonEncode(<String, dynamic>{
           'userId': userId,
           'entries': entries.map(_serializeTimeTableEntry).toList(),
+          'isTerminalYear': isTerminalYear,
         }),
       );
 

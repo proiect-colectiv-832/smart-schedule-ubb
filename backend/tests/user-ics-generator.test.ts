@@ -38,8 +38,119 @@ describe('user-ics-generator recurrence parity', () => {
   const mockedWriteFile = fs.writeFile as jest.MockedFunction<typeof fs.writeFile>;
   const mockedScrape = scrapeAcademicCalendar as jest.MockedFunction<typeof scrapeAcademicCalendar>;
 
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 3, 20));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test('uses semester II terminal structure when isTerminalYear is true', async () => {
+    const academicStructure: AcademicYearStructure = {
+      academicYear: '2025-2026',
+      language: 'ro-en',
+      lastScraped: new Date(2026, 3, 1),
+      semesters: [
+        {
+          semester: 'II',
+          yearType: 'non-terminal',
+          periods: [
+            {
+              startDate: new Date(2026, 1, 16),
+              endDate: new Date(2026, 3, 26),
+              type: 'teaching',
+              description: 'Activitate didactica non-terminal',
+            },
+            {
+              startDate: new Date(2026, 3, 27),
+              endDate: new Date(2026, 4, 3),
+              type: 'vacation',
+              description: 'Vacanta',
+            },
+            {
+              startDate: new Date(2026, 4, 4),
+              endDate: new Date(2026, 5, 7),
+              type: 'teaching',
+              description: 'Activitate didactica non-terminal',
+            },
+          ],
+        },
+        {
+          semester: 'II',
+          yearType: 'terminal',
+          periods: [
+            {
+              startDate: new Date(2026, 1, 16),
+              endDate: new Date(2026, 3, 26),
+              type: 'teaching',
+              description: 'Activitate didactica terminal',
+            },
+            {
+              startDate: new Date(2026, 3, 27),
+              endDate: new Date(2026, 4, 3),
+              type: 'vacation',
+              description: 'Vacanta',
+            },
+            {
+              startDate: new Date(2026, 4, 4),
+              endDate: new Date(2026, 4, 17),
+              type: 'teaching',
+              description: 'Activitate didactica terminal',
+            },
+          ],
+        },
+      ],
+    };
+
+    mockedScrape.mockResolvedValue([academicStructure]);
+
+    const entries: UserTimetableEntry[] = [
+      {
+        id: 11,
+        day: 'monday',
+        interval: {
+          start: { hour: 8, minute: 0 },
+          end: { hour: 10, minute: 0 },
+        },
+        subjectName: 'Compilatoare',
+        teacher: 'Test Teacher',
+        frequency: 'weekly',
+        type: 'lecture',
+        room: '',
+        format: '832',
+      },
+    ];
+
+    await generateUserICSFile('non-terminal-user', entries, {
+      language: 'ro-en',
+      isTerminalYear: false,
+      includeFreeDaysAsEvents: false,
+      includeVacationsAsEvents: false,
+    });
+
+    await generateUserICSFile('terminal-user', entries, {
+      language: 'ro-en',
+      isTerminalYear: true,
+      includeFreeDaysAsEvents: false,
+      includeVacationsAsEvents: false,
+    });
+
+    expect(mockedWriteFile).toHaveBeenCalledTimes(2);
+    const nonTerminalICS = mockedWriteFile.mock.calls[0][1] as string;
+    const terminalICS = mockedWriteFile.mock.calls[1][1] as string;
+
+    const nonTerminalDates = extractEventDatesBySummary(nonTerminalICS, 'Compilatoare (lecture)');
+    const terminalDates = extractEventDatesBySummary(terminalICS, 'Compilatoare (lecture)');
+
+    expect(nonTerminalDates).toContain('20260601');
+    expect(terminalDates).not.toContain('20260601');
+    expect(terminalDates).toContain('20260511');
   });
 
   test('keeps odd/even parity aligned after a full vacation week', async () => {

@@ -31,6 +31,7 @@ export interface UserTimetableEntry {
 export interface UserTimetableDocument extends Document {
   userId: string;
   entries: UserTimetableEntry[];
+  isTerminalYear?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,7 +57,8 @@ function getUserTimetablesCollection(): Collection<UserTimetableDocument> {
  */
 export async function saveUserTimetable(
   userId: string,
-  entries: UserTimetableEntry[]
+  entries: UserTimetableEntry[],
+  isTerminalYear: boolean = false
 ): Promise<UserTimetableDocument> {
   const collection = getUserTimetablesCollection();
   
@@ -64,6 +66,7 @@ export async function saveUserTimetable(
   const document: Omit<UserTimetableDocument, '_id'> = {
     userId,
     entries,
+    isTerminalYear,
     createdAt: now,
     updatedAt: now,
   };
@@ -74,6 +77,7 @@ export async function saveUserTimetable(
     {
       $set: {
         entries,
+        isTerminalYear,
         updatedAt: now,
       },
       $setOnInsert: {

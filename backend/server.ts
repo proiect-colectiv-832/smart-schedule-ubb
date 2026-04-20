@@ -1774,7 +1774,8 @@ app.get('/timetable/stats', async (req: Request, res: Response) => {
 // Save/update user timetable from mobile app
 app.post('/user-timetable', async (req: Request, res: Response) => {
   try {
-    const { userId, entries } = req.body;
+    const { userId, entries, isTerminalYear } = req.body;
+    const normalizedIsTerminalYear = isTerminalYear === true || isTerminalYear === 'true';
 
     // Validate required fields
     if (!userId) {
@@ -1849,12 +1850,17 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
     }
 
     // Save the timetable to MongoDB
-    const savedTimetable = await saveUserTimetableDB(userId, entries as UserTimetableEntry[]);
+    const savedTimetable = await saveUserTimetableDB(
+      userId,
+      entries as UserTimetableEntry[],
+      normalizedIsTerminalYear
+    );
 
     // Generate ICS file for the user
     try {
       const icsFilePath = await generateUserICSFile(userId, entries as UserTimetableEntry[], {
         language: 'ro-en',
+        isTerminalYear: normalizedIsTerminalYear,
         excludeVacations: true,
         includeFreeDaysAsEvents: true,
         includeVacationsAsEvents: false,
@@ -1872,6 +1878,7 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
       data: {
         userId: savedTimetable.userId,
         entriesCount: savedTimetable.entries.length,
+        isTerminalYear: savedTimetable.isTerminalYear === true,
         updatedAt: savedTimetable.updatedAt,
         icsFileUrl: `/icsfilesforusers/${userId}.ics`,
       },
@@ -1928,6 +1935,7 @@ app.get('/user-timetable', async (req: Request, res: Response) => {
       data: {
         userId: timetable.userId,
         entries: timetable.entries,
+        isTerminalYear: timetable.isTerminalYear === true,
         createdAt: timetable.createdAt,
         updatedAt: timetable.updatedAt,
       },
@@ -2132,6 +2140,7 @@ app.post('/icsfilesforusers/:userId/regenerate', async (req: Request, res: Respo
     // Regenerate ICS file
     const icsFilePath = await generateUserICSFile(userId, timetable.entries, {
       language: 'ro-en',
+      isTerminalYear: timetable.isTerminalYear === true,
       excludeVacations: true,
       includeFreeDaysAsEvents: true,
       includeVacationsAsEvents: false,

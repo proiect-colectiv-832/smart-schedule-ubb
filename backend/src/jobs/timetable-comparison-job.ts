@@ -302,14 +302,18 @@ const previousTimetableEntries: Map<string, UserTimetableEntry[]> = new Map();
 /**
  * Update ICS file for a user with new timetable entries
  */
-async function updateUserICSFile(userId: string, entries: UserTimetableEntry[]): Promise<void> {
+async function updateUserICSFile(
+  userId: string,
+  entries: UserTimetableEntry[],
+  isTerminalYear: boolean = false
+): Promise<void> {
   try {
     // Check if user has an ICS file (only update if they have one)
     const hasICSFile = await userICSFileExists(userId);
     
     if (hasICSFile) {
       // Regenerate ICS file with new timetable data
-      await generateUserICSFile(userId, entries);
+      await generateUserICSFile(userId, entries, { isTerminalYear });
       console.log(`📅 Updated ICS file for user ${userId} with new timetable`);
     } else {
       console.log(`⏭️  Skipped ICS update for user ${userId} (no existing ICS file)`);
@@ -376,7 +380,7 @@ export async function compareTimetablesForAllUsers(): Promise<{
             result.notificationsCreated++;
             
             // Update ICS file if it exists
-            await updateUserICSFile(userId, currentEntries);
+            await updateUserICSFile(userId, currentEntries, timetable.isTerminalYear === true);
             result.icsFilesUpdated++;
           }
           
@@ -480,7 +484,7 @@ export async function checkUserTimetableChanges(userId: string): Promise<{
     let icsFileUpdated = false;
     if (changes.length > 0) {
       try {
-        await updateUserICSFile(userId, currentEntries);
+        await updateUserICSFile(userId, currentEntries, timetable.isTerminalYear === true);
         icsFileUpdated = true;
       } catch (error) {
         console.error(`Failed to update ICS file for user ${userId}:`, error);

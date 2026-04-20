@@ -343,6 +343,11 @@ class MobileDataProvider extends BaseProvider {
       if (userId == null) {
         return;
       }
+      final bool isTerminalYear =
+          selectedField != null &&
+          selectedYear != null &&
+          selectedField!.years.isNotEmpty &&
+          selectedYear == selectedField!.years.reduce((a, b) => a > b ? a : b);
       final List<TimeTableEntry> entries;
       if (currentTimeTable != null &&
           !(currentTimeTable is TeacherTimeTable) &&
@@ -352,7 +357,11 @@ class MobileDataProvider extends BaseProvider {
         entries = <TimeTableEntry>[];
       }
 
-      await api.postUserTimetable(userId: userId, entries: entries);
+      await api.postUserTimetable(
+        userId: userId,
+        entries: entries,
+        isTerminalYear: isTerminalYear,
+      );
     } catch (e) {
       debugPrint('Failed to sync personalized timetable: $e');
     }

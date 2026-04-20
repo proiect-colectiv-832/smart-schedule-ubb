@@ -201,7 +201,8 @@ function getDefaultSemesterDates(): { start: Date; end: Date } {
  */
 async function getTeachingEndDate(
   semesterStartHint: Date,
-  language: 'ro-en' | 'hu-de' = 'ro-en'
+  language: 'ro-en' | 'hu-de' = 'ro-en',
+  isTerminalYear: boolean = false
 ): Promise<Date | null> {
   try {
     const structure = await getAcademicStructure(language);
@@ -213,29 +214,28 @@ async function getTeachingEndDate(
     const currentMonth = now.getMonth();
     const isFallSemester = currentMonth >= 8 || currentMonth <= 0; // Sep-Jan = Fall/Semester I
 
-    let teachingEndDate: Date | null = null;
-
     for (const semester of structure.semesters) {
       // Match semester I for fall, semester II for spring
       if (isFallSemester && semester.semester !== 'I') continue;
       if (!isFallSemester && semester.semester !== 'II') continue;
 
-      // For semester II, prefer non-terminal (most students are non-terminal)
-      // Skip terminal variant if we already found a non-terminal one
-      if (semester.semester === 'II' && semester.yearType === 'terminal' && teachingEndDate) continue;
+      // In semester II, select the structure matching user year type.
+      if (semester.semester === 'II' && semester.yearType) {
+        if (isTerminalYear && semester.yearType !== 'terminal') continue;
+        if (!isTerminalYear && semester.yearType !== 'non-terminal') continue;
+      }
 
       // Find the last teaching period
       for (let i = semester.periods.length - 1; i >= 0; i--) {
         const period = semester.periods[i];
         if (period.type === 'teaching') {
           console.log(`📅 Found teaching end date: ${period.endDate.toLocaleDateString('ro-RO')} for semester ${semester.semester}${semester.yearType ? ` (${semester.yearType})` : ''}`);
-          teachingEndDate = period.endDate;
-          break;
+          return period.endDate;
         }
       }
     }
 
-    return teachingEndDate;
+    return null;
   } catch (error) {
     console.error('Error getting teaching end date:', error);
     return null;
@@ -317,6 +317,23 @@ export async function convertJSONTimetableToEvents(
 function isDateInVacation(date: Date, structure: AcademicYearStructure | null): boolean {
   if (!structure) return false;
   return isNonTeachingDay(date, structure);
+}
+
+function filterStructureForYearType(
+  structure: AcademicYearStructure,
+  isTerminalYear: boolean
+): AcademicYearStructure {
+  const filteredSemesters = structure.semesters.filter((semester) => {
+    if (semester.semester !== 'II' || !semester.yearType) {
+      return true;
+    }
+    return isTerminalYear ? semester.yearType === 'terminal' : semester.yearType === 'non-terminal';
+  });
+
+  return {
+    ...structure,
+    semesters: filteredSemesters.length > 0 ? filteredSemesters : structure.semesters,
+  };
 }
 
 function getMondayOfContainingWeek(date: Date): Date {
@@ -408,7 +425,8 @@ function generateEventOccurrences(
  * Determine the start of teaching period from academic structure
  */
 async function getTeachingStartDate(
-  language: 'ro-en' | 'hu-de' = 'ro-en'
+  language: 'ro-en' | 'hu-de' = 'ro-en',
+  isTerminalYear: boolean = false
 ): Promise<Date | null> {
   try {
     const structure = await getAcademicStructure(language);
@@ -422,8 +440,10 @@ async function getTeachingStartDate(
       if (isFallSemester && semester.semester !== 'I') continue;
       if (!isFallSemester && semester.semester !== 'II') continue;
 
-      // For semester II, prefer non-terminal
-      if (semester.semester === 'II' && semester.yearType === 'terminal') continue;
+      if (semester.semester === 'II' && semester.yearType) {
+        if (isTerminalYear && semester.yearType !== 'terminal') continue;
+        if (!isTerminalYear && semester.yearType !== 'non-terminal') continue;
+      }
 
       // Find the first teaching period
       for (const period of semester.periods) {
@@ -449,6 +469,7 @@ export async function generateUserICSFile(
   entries: UserTimetableEntry[],
   options?: {
     language?: 'ro-en' | 'hu-de';
+    isTerminalYear?: boolean;
     semesterStart?: Date;
     semesterEnd?: Date;
     excludeVacations?: boolean;
@@ -458,6 +479,7 @@ export async function generateUserICSFile(
 ): Promise<string> {
   const opts = {
     language: 'ro-en' as 'ro-en' | 'hu-de',
+    isTerminalYear: false,
     excludeVacations: true,
     includeFreeDaysAsEvents: true,
     includeVacationsAsEvents: false,
@@ -470,7 +492,7 @@ export async function generateUserICSFile(
   // Determine correct semester start date from academic structure
   let semesterStart = opts.semesterStart;
   if (!semesterStart) {
-    const teachingStartDate = await getTeachingStartDate(opts.language);
+    const teachingStartDate = await getTeachingStartDate(opts.language, opts.isTerminalYear);
     semesterStart = teachingStartDate || defaultStart;
     console.log(`📅 Using teaching start date: ${semesterStart.toLocaleDateString('ro-RO')}`);
   }
@@ -479,7 +501,7 @@ export async function generateUserICSFile(
   // This is crucial to avoid generating events during exam period
   let semesterEnd = opts.semesterEnd;
   if (!semesterEnd) {
-    const teachingEndDate = await getTeachingEndDate(semesterStart, opts.language);
+    const teachingEndDate = await getTeachingEndDate(semesterStart, opts.language, opts.isTerminalYear);
     semesterEnd = teachingEndDate || defaultEnd;
     console.log(`📅 Using teaching end date: ${semesterEnd.toLocaleDateString('ro-RO')}`);
   }
@@ -492,7 +514,10 @@ export async function generateUserICSFile(
   );
 
   // Get academic structure
-  const academicStructure = await getAcademicStructure(opts.language);
+  const fullAcademicStructure = await getAcademicStructure(opts.language);
+  const academicStructure = fullAcademicStructure
+    ? filterStructureForYearType(fullAcademicStructure, opts.isTerminalYear)
+    : null;
 
   // Create calendar with VTIMEZONE component
   const calendar = ical({
