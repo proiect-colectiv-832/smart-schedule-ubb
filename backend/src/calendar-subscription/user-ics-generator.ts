@@ -320,6 +320,27 @@ function isDateInVacation(date: Date, structure: AcademicYearStructure | null): 
 }
 
 /**
+ * Treat a week as "paused" for odd/even parity if all days are non-teaching.
+ * This prevents week parity from shifting across full vacation weeks.
+ */
+function isFullNonTeachingWeek(weekDate: Date, structure: AcademicYearStructure | null): boolean {
+  if (!structure) return false;
+
+  const weekStart = new Date(weekDate);
+  weekStart.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + i);
+    if (!isNonTeachingDay(day, structure)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Generate all occurrences of a recurring event
  */
 function generateEventOccurrences(
@@ -337,15 +358,15 @@ function generateEventOccurrences(
   const until = rule.until || new Date(event.startTime.getFullYear() + 1, 5, 30);
 
   let currentDate = new Date(event.startTime);
-  let weekNumber = 0;
+  let teachingWeekIndex = 0;
 
   while (currentDate <= until) {
     // Check frequency rule
     let shouldInclude = true;
 
-    if (rule.frequency === 'oddweeks' && weekNumber % 2 !== 0) {
+    if (rule.frequency === 'oddweeks' && teachingWeekIndex % 2 !== 0) {
       shouldInclude = false;
-    } else if (rule.frequency === 'evenweeks' && weekNumber % 2 === 0) {
+    } else if (rule.frequency === 'evenweeks' && teachingWeekIndex % 2 === 0) {
       shouldInclude = false;
     }
 
@@ -365,8 +386,11 @@ function generateEventOccurrences(
     }
 
     // Move to next week
+    const fullNonTeachingWeek = excludeVacations && isFullNonTeachingWeek(currentDate, structure);
     currentDate.setDate(currentDate.getDate() + 7);
-    weekNumber++;
+    if (!fullNonTeachingWeek) {
+      teachingWeekIndex++;
+    }
   }
 
   return occurrences;
