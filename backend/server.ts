@@ -2107,6 +2107,7 @@ app.get('/icsfilesforusers', async (req: Request, res: Response) => {
 app.post('/icsfilesforusers/:userId/regenerate', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const { isTerminalYear } = req.body || {};
 
     if (!userId) {
       return res.status(400).json({
@@ -2138,9 +2139,18 @@ app.post('/icsfilesforusers/:userId/regenerate', async (req: Request, res: Respo
     }
 
     // Regenerate ICS file
+    const terminalYearOverride =
+      typeof isTerminalYear === 'boolean'
+        ? isTerminalYear
+        : isTerminalYear === 'true'
+          ? true
+          : isTerminalYear === 'false'
+            ? false
+            : undefined;
+
     const icsFilePath = await generateUserICSFile(userId, timetable.entries, {
       language: 'ro-en',
-      isTerminalYear: timetable.isTerminalYear === true,
+      isTerminalYear: terminalYearOverride ?? (timetable.isTerminalYear === true),
       excludeVacations: true,
       includeFreeDaysAsEvents: true,
       includeVacationsAsEvents: false,

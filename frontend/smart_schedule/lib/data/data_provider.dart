@@ -70,11 +70,27 @@ class MobileDataProvider extends BaseProvider {
       );
       currentTimeTable = tt;
       subjects = _buildSubjectsFromEntries(tt.entries);
+      await _persistTerminalYearIfKnown();
       await _persistPersonalizedIfStudent();
       notifyListeners();
     } finally {
       setIsLoading(false);
     }
+  }
+
+  bool? _computeTerminalYearFromSelection() {
+    if (selectedField == null || selectedYear == null || selectedField!.years.isEmpty) {
+      return null;
+    }
+    final int maxYear = selectedField!.years.reduce((a, b) => a > b ? a : b);
+    return selectedYear == maxYear;
+  }
+
+  Future<void> _persistTerminalYearIfKnown() async {
+    final bool? isTerminalYear = _computeTerminalYearFromSelection();
+    if (isTerminalYear == null) return;
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_terminal_year', isTerminalYear);
   }
 
   @override
@@ -231,6 +247,10 @@ class MobileDataProvider extends BaseProvider {
 
   Future<void> _persistPersonalizedIfStudent() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool? isTerminalYear = _computeTerminalYearFromSelection();
+    if (isTerminalYear != null) {
+      await prefs.setBool('is_terminal_year', isTerminalYear);
+    }
     
     
     if (currentTimeTable != null &&
@@ -343,11 +363,11 @@ class MobileDataProvider extends BaseProvider {
       if (userId == null) {
         return;
       }
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
       final bool isTerminalYear =
-          selectedField != null &&
-          selectedYear != null &&
-          selectedField!.years.isNotEmpty &&
-          selectedYear == selectedField!.years.reduce((a, b) => a > b ? a : b);
+          _computeTerminalYearFromSelection() ??
+          prefs.getBool('is_terminal_year') ??
+          false;
       final List<TimeTableEntry> entries;
       if (currentTimeTable != null &&
           !(currentTimeTable is TeacherTimeTable) &&
