@@ -319,6 +319,15 @@ function isDateInVacation(date: Date, structure: AcademicYearStructure | null): 
   return isNonTeachingDay(date, structure);
 }
 
+function getMondayOfContainingWeek(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  const dayOfWeek = result.getDay();
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  result.setDate(result.getDate() - daysToSubtract);
+  return result;
+}
+
 /**
  * Treat a week as "paused" for odd/even parity if all days are non-teaching.
  * This prevents week parity from shifting across full vacation weeks.
@@ -326,8 +335,7 @@ function isDateInVacation(date: Date, structure: AcademicYearStructure | null): 
 function isFullNonTeachingWeek(weekDate: Date, structure: AcademicYearStructure | null): boolean {
   if (!structure) return false;
 
-  const weekStart = new Date(weekDate);
-  weekStart.setHours(0, 0, 0, 0);
+  const weekStart = getMondayOfContainingWeek(weekDate);
 
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart);

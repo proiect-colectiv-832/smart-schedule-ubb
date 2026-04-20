@@ -62,14 +62,23 @@ function determinePeriodType(description: string): AcademicPeriod['type'] {
 
   // Verificăm mai întâi zilele libere (sărbători naționale)
   if (lowerDesc.includes('zi liberă') ||
+      lowerDesc.includes('zi libera') ||
       lowerDesc.includes('zi nelucrătoare') ||
+      lowerDesc.includes('zi nelucratoare') ||
       lowerDesc.includes('sărbătoare') ||
+      lowerDesc.includes('sarbatoare') ||
       lowerDesc.includes('free day') ||
       lowerDesc.includes('holiday')) {
     return 'free-day';
-  } else if (lowerDesc.includes('activitate didactică') || lowerDesc.includes('pregătirea anului')) {
+  } else if (lowerDesc.includes('activitate didactică') ||
+             lowerDesc.includes('activitate didactica') ||
+             lowerDesc.includes('pregătirea anului') ||
+             lowerDesc.includes('pregatirea anului')) {
     return 'teaching';
-  } else if (lowerDesc.includes('vacanț')) {
+  } else if (lowerDesc.includes('vacanț') ||
+             lowerDesc.includes('vacant') ||
+             lowerDesc.includes('vacation') ||
+             lowerDesc.includes('break')) {
     return 'vacation';
   } else if (lowerDesc.includes('sesiune de examene')) {
     return 'exams';
