@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as http from 'http';
+import * as fs from 'fs/promises';
 import cron from 'node-cron';
 import {
   parseTimetable,
@@ -60,10 +61,6 @@ import {
   getCalendarMetadata
 } from './src/calendar-subscription/icalendar-generator';
 import {
-  convertTimetableEntriesToEvents,
-  getDefaultSemesterDates
-} from './src/calendar-subscription/timetable-to-events-converter';
-import {
   initializeMongoDB,
   getDatabase,
   closeMongoDBConnection,
@@ -80,11 +77,12 @@ import {
 import {
   initializeICSDirectory,
   generateUserICSFile,
+  getCurrentTeachingDates,
   getUserICSFilePath,
-  userICSFileExists,
   deleteUserICSFile,
   getAllICSFiles
 } from './src/calendar-subscription/user-ics-generator';
+import { normalizeTimetableFrequency } from './src/calendar-subscription/timetable-frequency';
 import {
   compareTimetablesForAllUsers,
   initializeTimetableComparison,
@@ -95,6 +93,7 @@ import {
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+const serverStartedAt = Date.now();
 
 // Initialize push notification manager
 let pushManager: PushNotificationManager;
@@ -138,17 +137,7 @@ function transformTimetableEntry(entry: TimetableEntry, id: number) {
     'sunday': 'sunday'
   };
 
-  // Normalize frequency - check for specific patterns first
-  let frequency = 'weekly'; // default
-  const freqLower = (entry.frequency || '').toLowerCase().trim();
-
-  if (freqLower.includes('sapt. 1') || freqLower.includes('săpt. 1') || freqLower === 's1') {
-    frequency = 'oddweeks'; // săptămână impară
-  } else if (freqLower.includes('sapt. 2') || freqLower.includes('săpt. 2') || freqLower === 's2') {
-    frequency = 'evenweeks'; // săptămână pară
-  } else if (freqLower.includes('1-14') || freqLower.includes('săpt') || freqLower.includes('sapt')) {
-    frequency = 'weekly'; // toate săptămânile
-  }
+  const frequency = normalizeTimetableFrequency(entry.frequency || '');
 
   // Normalize type
   const typeMap: Record<string, string> = {
@@ -1857,6 +1846,7 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
     );
 
     // Generate ICS file for the user
+    let calendarError: string | null = null;
     try {
       const icsFilePath = await generateUserICSFile(userId, entries as UserTimetableEntry[], {
         language: 'ro-en',
@@ -1868,7 +1858,8 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
       console.log(`📅 Generated ICS file for user ${userId}: ${icsFilePath}`);
     } catch (icsError) {
       console.error(`Warning: Failed to generate ICS file for user ${userId}:`, icsError);
-      // Don't fail the request if ICS generation fails
+      calendarError = icsError instanceof Error ? icsError.message : 'Calendar generation failed';
+      await deleteUserICSFile(userId);
     }
 
     res.status(200).json({
@@ -1880,7 +1871,8 @@ app.post('/user-timetable', async (req: Request, res: Response) => {
         entriesCount: savedTimetable.entries.length,
         isTerminalYear: savedTimetable.isTerminalYear === true,
         updatedAt: savedTimetable.updatedAt,
-        icsFileUrl: `/icsfilesforusers/${userId}.ics`,
+        icsFileUrl: calendarError ? null : `/icsfilesforusers/${userId}.ics`,
+        calendarError,
       },
     });
 
@@ -2042,20 +2034,32 @@ app.get('/user-timetable/stats', async (req: Request, res: Response) => {
 // Get ICS file for a specific user
 app.get('/icsfilesforusers/:userId.ics', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = String(req.params.userId || '');
 
     if (!userId) {
       return res.status(400).send('Missing userId parameter');
     }
 
-    // Check if ICS file exists
-    const exists = await userICSFileExists(userId);
-    if (!exists) {
-      return res.status(404).send('ICS file not found for this user. Please save a timetable first.');
+    const filePath = getUserICSFilePath(userId);
+    let needsRegeneration = true;
+    try {
+      needsRegeneration = (await fs.stat(filePath)).mtimeMs < serverStartedAt;
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') throw error;
     }
 
-    // Get file path
-    const filePath = getUserICSFilePath(userId);
+    if (needsRegeneration) {
+      if (!await isConnected()) {
+        return res.status(503).send('Calendar unavailable: timetable database is not connected.');
+      }
+      const timetable = await getUserTimetableDB(userId);
+      if (!timetable) {
+        return res.status(404).send('Calendar not found. Please save a timetable first.');
+      }
+      await generateUserICSFile(userId, timetable.entries, {
+        isTerminalYear: timetable.isTerminalYear === true,
+      });
+    }
 
     // Set proper headers for ICS file
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
@@ -2379,14 +2383,14 @@ app.get('/icalendar/metadata', async (req: Request, res: Response) => {
 // Get default semester dates
 app.get('/timetable/events/default-dates', async (req: Request, res: Response) => {
   try {
-    const dates = getDefaultSemesterDates();
+    const dates = await getCurrentTeachingDates();
     res.json({
       success: true,
       data: dates
     });
   } catch (error: any) {
     console.error('Error getting default dates:', error);
-    res.status(500).json({
+    res.status(503).json({
       success: false,
       error: 'Failed to get default semester dates',
       message: error.message || 'Unknown error occurred',

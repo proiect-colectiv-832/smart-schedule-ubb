@@ -11,11 +11,11 @@ import {
   scrapeAcademicCalendar,
   getVacations,
   getFreeDays,
-  isNonTeachingDay,
   AcademicYearStructure
 } from './academic-calendar-scraper';
 import { UserTimetableEntry } from '../database/user-timetable-db';
 import { formatRoomInfoForDescription, formatRoomLocationForCalendar } from './room-location-service';
+import { getTeachingOccurrences, getTeachingTerm, occurrenceId } from './teaching-weeks';
 
 const TIMEZONE = 'Europe/Bucharest';
 const ICS_FILES_DIR = path.join(__dirname, '../../ics-files-for-users');
@@ -45,9 +45,12 @@ END:VTIMEZONE`;
 }
 
 // Cache for academic structure
-let cachedAcademicStructure: AcademicYearStructure | null = null;
-let cacheTimestamp: Date | null = null;
+const academicStructureCache = new Map<'ro-en' | 'hu-de', { structure: AcademicYearStructure; timestamp: Date }>();
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export function invalidateUserAcademicCache(): void {
+  academicStructureCache.clear();
+}
 
 /**
  * Initialize ICS files directory
@@ -68,10 +71,11 @@ export async function initializeICSDirectory(): Promise<void> {
 async function getAcademicStructure(language: 'ro-en' | 'hu-de' = 'ro-en'): Promise<AcademicYearStructure | null> {
   try {
     // Check cache
-    if (cachedAcademicStructure && cacheTimestamp) {
+    const cached = academicStructureCache.get(language);
+    if (cached) {
       const now = new Date();
-      if (now.getTime() - cacheTimestamp.getTime() < CACHE_DURATION_MS) {
-        return cachedAcademicStructure;
+      if (now.getTime() - cached.timestamp.getTime() < CACHE_DURATION_MS) {
+        return cached.structure;
       }
     }
 
@@ -81,8 +85,7 @@ async function getAcademicStructure(language: 'ro-en' | 'hu-de' = 'ro-en'): Prom
     const structure = structures.find(s => s.language === language);
 
     if (structure) {
-      cachedAcademicStructure = structure;
-      cacheTimestamp = new Date();
+      academicStructureCache.set(language, { structure, timestamp: new Date() });
       console.log(`Academic calendar cached for ${structure.academicYear}`);
       return structure;
     }
@@ -147,99 +150,17 @@ function getNextDayOfWeek(fromDate: Date, dayOfWeek: number): Date {
   return result;
 }
 
-/**
- * Get the Monday of the week containing a given date
- * This is important because UBB semesters start on the Monday of the week
- * containing October 1st (fall) or February 1st (spring)
- */
-function getMondayOfWeek(date: Date): Date {
-  const result = new Date(date);
-  const dayOfWeek = result.getDay();
-  // getDay() returns 0 for Sunday, 1 for Monday, etc.
-  // We need to go back to Monday (if Sunday, go back 6 days; if Monday, stay; if Tuesday, go back 1 day, etc.)
-  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  result.setDate(result.getDate() - daysToSubtract);
-  return result;
-}
-
-/**
- * Get default semester dates based on current date
- * UBB semesters typically:
- * - Fall semester (Semester I): late September to mid-January
- * - Spring semester (Semester II): mid-February to early June
- */
-function getDefaultSemesterDates(): { start: Date; end: Date } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  let start: Date;
-  let end: Date;
-
-  // Fall semester (September - January)
-  if (month >= 9 || month <= 0) {
-    // Get October 1st of the appropriate year
-    const oct1 = new Date(month >= 9 ? year : year - 1, 9, 1);
-    // Get the Monday of the week containing October 1st
-    start = getMondayOfWeek(oct1);
-    end = new Date(month >= 9 ? year + 1 : year, 0, 18); // January 18 (typical end of teaching)
-  }
-  // Spring semester (February - June/August)
-  else {
-    // Spring semester typically starts around mid-February
-    // Use February 17 as default (common start date), getMondayOfWeek ensures we get a Monday
-    const feb17 = new Date(year, 1, 17);
-    start = getMondayOfWeek(feb17);
-    end = new Date(year, 5, 7); // June 7 (typical end of teaching for non-terminal)
-  }
-
-  return { start, end };
-}
-
-/**
- * Determine the end of teaching period from academic structure
- */
-async function getTeachingEndDate(
-  semesterStartHint: Date,
+/** Return the published teaching bounds for the current semester. */
+export async function getCurrentTeachingDates(
   language: 'ro-en' | 'hu-de' = 'ro-en',
   isTerminalYear: boolean = false
-): Promise<Date | null> {
-  try {
-    const structure = await getAcademicStructure(language);
-    if (!structure) return null;
-
-    // Determine which semester we're in based on current date, not semesterStartHint
-    // (semesterStartHint can land in January for spring semester due to getMondayOfWeek)
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const isFallSemester = currentMonth >= 8 || currentMonth <= 0; // Sep-Jan = Fall/Semester I
-
-    for (const semester of structure.semesters) {
-      // Match semester I for fall, semester II for spring
-      if (isFallSemester && semester.semester !== 'I') continue;
-      if (!isFallSemester && semester.semester !== 'II') continue;
-
-      // In semester II, select the structure matching user year type.
-      if (semester.semester === 'II' && semester.yearType) {
-        if (isTerminalYear && semester.yearType !== 'terminal') continue;
-        if (!isTerminalYear && semester.yearType !== 'non-terminal') continue;
-      }
-
-      // Find the last teaching period
-      for (let i = semester.periods.length - 1; i >= 0; i--) {
-        const period = semester.periods[i];
-        if (period.type === 'teaching') {
-          console.log(`📅 Found teaching end date: ${period.endDate.toLocaleDateString('ro-RO')} for semester ${semester.semester}${semester.yearType ? ` (${semester.yearType})` : ''}`);
-          return period.endDate;
-        }
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting teaching end date:', error);
-    return null;
-  }
+): Promise<{ start: Date; end: Date }> {
+  const structure = await getAcademicStructure(language);
+  if (!structure) throw new Error('Academic structure is unavailable');
+  const term = getTeachingTerm(structure, new Date(), isTerminalYear);
+  if (!term) throw new Error('Academic structure for the current semester is unavailable');
+  const { start, end } = term;
+  return { start, end };
 }
 
 /**
@@ -247,19 +168,15 @@ async function getTeachingEndDate(
  */
 export async function convertJSONTimetableToEvents(
   entries: UserTimetableEntry[],
-  semesterStart?: Date,
-  semesterEnd?: Date
+  semesterStart: Date,
+  semesterEnd: Date
 ): Promise<UserEvent[]> {
-  const { start: defaultStart, end: defaultEnd } = getDefaultSemesterDates();
-  const start = semesterStart || defaultStart;
-  const end = semesterEnd || defaultEnd;
-
   const events: UserEvent[] = [];
 
   for (const entry of entries) {
     try {
       const dayOfWeek = parseDayOfWeek(entry.day);
-      const firstOccurrence = getNextDayOfWeek(start, dayOfWeek);
+      const firstOccurrence = getNextDayOfWeek(semesterStart, dayOfWeek);
 
       // Create start time
       const startTime = new Date(firstOccurrence);
@@ -274,7 +191,7 @@ export async function convertJSONTimetableToEvents(
       const recurrenceRule: RecurrenceRule = {
         frequency,
         daysOfWeek: [dayOfWeek],
-        until: end,
+        until: semesterEnd,
       };
 
       // Parse event type
@@ -311,14 +228,6 @@ export async function convertJSONTimetableToEvents(
   return events;
 }
 
-/**
- * Check if a date falls during a vacation period or free day
- */
-function isDateInVacation(date: Date, structure: AcademicYearStructure | null): boolean {
-  if (!structure) return false;
-  return isNonTeachingDay(date, structure);
-}
-
 function filterStructureForYearType(
   structure: AcademicYearStructure,
   isTerminalYear: boolean
@@ -334,131 +243,6 @@ function filterStructureForYearType(
     ...structure,
     semesters: filteredSemesters.length > 0 ? filteredSemesters : structure.semesters,
   };
-}
-
-function getMondayOfContainingWeek(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  const dayOfWeek = result.getDay();
-  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  result.setDate(result.getDate() - daysToSubtract);
-  return result;
-}
-
-/**
- * Treat a week as "paused" for odd/even parity if all days are non-teaching.
- * This prevents week parity from shifting across full vacation weeks.
- */
-function isFullNonTeachingWeek(weekDate: Date, structure: AcademicYearStructure | null): boolean {
-  if (!structure) return false;
-
-  const weekStart = getMondayOfContainingWeek(weekDate);
-
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(weekStart);
-    day.setDate(weekStart.getDate() + i);
-    if (!isNonTeachingDay(day, structure)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Generate all occurrences of a recurring event
- */
-function generateEventOccurrences(
-  event: UserEvent,
-  structure: AcademicYearStructure | null,
-  excludeVacations: boolean = true
-): Array<{ start: Date; end: Date }> {
-  const occurrences: Array<{ start: Date; end: Date }> = [];
-
-  if (!event.isRecurring || !event.recurrenceRule) {
-    return [{ start: event.startTime, end: event.endTime }];
-  }
-
-  const rule = event.recurrenceRule;
-  const until = rule.until || new Date(event.startTime.getFullYear() + 1, 5, 30);
-
-  let currentDate = new Date(event.startTime);
-  let teachingWeekIndex = 0;
-
-  while (currentDate <= until) {
-    // Check frequency rule
-    let shouldInclude = true;
-
-    if (rule.frequency === 'oddweeks' && teachingWeekIndex % 2 !== 0) {
-      shouldInclude = false;
-    } else if (rule.frequency === 'evenweeks' && teachingWeekIndex % 2 === 0) {
-      shouldInclude = false;
-    }
-
-    // Check if during vacation
-    if (shouldInclude && excludeVacations && isDateInVacation(currentDate, structure)) {
-      shouldInclude = false;
-    }
-
-    if (shouldInclude) {
-      const start = new Date(currentDate);
-      start.setHours(event.startTime.getHours(), event.startTime.getMinutes(), 0, 0);
-
-      const end = new Date(currentDate);
-      end.setHours(event.endTime.getHours(), event.endTime.getMinutes(), 0, 0);
-
-      occurrences.push({ start, end });
-    }
-
-    // Move to next week
-    const fullNonTeachingWeek = excludeVacations && isFullNonTeachingWeek(currentDate, structure);
-    currentDate.setDate(currentDate.getDate() + 7);
-    if (!fullNonTeachingWeek) {
-      teachingWeekIndex++;
-    }
-  }
-
-  return occurrences;
-}
-
-/**
- * Determine the start of teaching period from academic structure
- */
-async function getTeachingStartDate(
-  language: 'ro-en' | 'hu-de' = 'ro-en',
-  isTerminalYear: boolean = false
-): Promise<Date | null> {
-  try {
-    const structure = await getAcademicStructure(language);
-    if (!structure) return null;
-
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const isFallSemester = currentMonth >= 8 || currentMonth <= 0;
-
-    for (const semester of structure.semesters) {
-      if (isFallSemester && semester.semester !== 'I') continue;
-      if (!isFallSemester && semester.semester !== 'II') continue;
-
-      if (semester.semester === 'II' && semester.yearType) {
-        if (isTerminalYear && semester.yearType !== 'terminal') continue;
-        if (!isTerminalYear && semester.yearType !== 'non-terminal') continue;
-      }
-
-      // Find the first teaching period
-      for (const period of semester.periods) {
-        if (period.type === 'teaching') {
-          console.log(`📅 Found teaching start date: ${period.startDate.toLocaleDateString('ro-RO')} for semester ${semester.semester}${semester.yearType ? ` (${semester.yearType})` : ''}`);
-          return period.startDate;
-        }
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting teaching start date:', error);
-    return null;
-  }
 }
 
 /**
@@ -486,25 +270,14 @@ export async function generateUserICSFile(
     ...options
   };
 
-  // Get default semester dates
-  const { start: defaultStart, end: defaultEnd } = getDefaultSemesterDates();
-
-  // Determine correct semester start date from academic structure
-  let semesterStart = opts.semesterStart;
-  if (!semesterStart) {
-    const teachingStartDate = await getTeachingStartDate(opts.language, opts.isTerminalYear);
-    semesterStart = teachingStartDate || defaultStart;
-    console.log(`📅 Using teaching start date: ${semesterStart.toLocaleDateString('ro-RO')}`);
-  }
-
-  // Determine correct semester end date from academic structure
-  // This is crucial to avoid generating events during exam period
-  let semesterEnd = opts.semesterEnd;
-  if (!semesterEnd) {
-    const teachingEndDate = await getTeachingEndDate(semesterStart, opts.language, opts.isTerminalYear);
-    semesterEnd = teachingEndDate || defaultEnd;
-    console.log(`📅 Using teaching end date: ${semesterEnd.toLocaleDateString('ro-RO')}`);
-  }
+  const fullAcademicStructure = await getAcademicStructure(opts.language);
+  if (!fullAcademicStructure) throw new Error('Academic structure is unavailable');
+  const term = getTeachingTerm(fullAcademicStructure, opts.semesterStart || new Date(), opts.isTerminalYear);
+  if (!term) throw new Error('Academic structure for the requested semester is unavailable');
+  const semesterStart = opts.semesterStart && opts.semesterStart > term.start
+    ? opts.semesterStart : term.start;
+  const semesterEnd = opts.semesterEnd && opts.semesterEnd < term.end
+    ? opts.semesterEnd : term.end;
 
   // Convert JSON timetable to events
   const events = await convertJSONTimetableToEvents(
@@ -513,11 +286,7 @@ export async function generateUserICSFile(
     semesterEnd
   );
 
-  // Get academic structure
-  const fullAcademicStructure = await getAcademicStructure(opts.language);
-  const academicStructure = fullAcademicStructure
-    ? filterStructureForYearType(fullAcademicStructure, opts.isTerminalYear)
-    : null;
+  const academicStructure = filterStructureForYearType(fullAcademicStructure, opts.isTerminalYear);
 
   // Create calendar with VTIMEZONE component
   const calendar = ical({
@@ -538,14 +307,11 @@ export async function generateUserICSFile(
 
   // Add events to calendar
   for (const event of events) {
-    const occurrences = generateEventOccurrences(
-      event,
-      academicStructure,
-      opts.excludeVacations
-    );
+    const occurrences = getTeachingOccurrences(event, academicStructure, term);
 
     for (const occurrence of occurrences) {
       calendar.createEvent({
+        id: occurrenceId(userId, event.id, occurrence.start),
         start: occurrence.start,
         end: occurrence.end,
         summary: event.title,
@@ -561,6 +327,7 @@ export async function generateUserICSFile(
     const freeDays = getFreeDays(academicStructure);
     for (const freeDay of freeDays) {
       calendar.createEvent({
+        id: `free-day-${freeDay.startDate.getTime()}`,
         start: freeDay.startDate,
         end: new Date(freeDay.endDate.getTime() + 24 * 60 * 60 * 1000), // +1 day for all-day events
         summary: `🎉 ${freeDay.description}`,
@@ -576,6 +343,7 @@ export async function generateUserICSFile(
     const vacations = getVacations(academicStructure);
     for (const vacation of vacations) {
       calendar.createEvent({
+        id: `vacation-${vacation.startDate.getTime()}`,
         start: vacation.startDate,
         end: new Date(vacation.endDate.getTime() + 24 * 60 * 60 * 1000), // +1 day for all-day events
         summary: `🏖️ ${vacation.description}`,
@@ -645,4 +413,3 @@ export async function getAllICSFiles(): Promise<string[]> {
     return [];
   }
 }
-

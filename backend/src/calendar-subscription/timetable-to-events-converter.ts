@@ -7,6 +7,7 @@ import { TimetableEntry } from '../types';
 import { UserEvent, RecurrenceRule } from './user-timetable-manager';
 import { v4 as uuidv4 } from 'uuid';
 import { formatRoomInfoForDescription, formatRoomLocationForCalendar } from './room-location-service';
+import { normalizeTimetableFrequency } from './timetable-frequency';
 
 /**
  * Convert timetable entries to user events
@@ -164,16 +165,12 @@ function parseRecurrenceRule(
   dayOfWeek: number,
   semesterEnd?: Date
 ): RecurrenceRule {
-  const freqLower = frequency.toLowerCase().trim();
-
   let freq: 'weekly' | 'biweekly' | 'oddweeks' | 'evenweeks' = 'weekly';
 
-  if (freqLower.includes('sapt. 1') || freqLower.includes('săpt. 1') || freqLower === 's1') {
-    freq = 'oddweeks';
-  } else if (freqLower.includes('sapt. 2') || freqLower.includes('săpt. 2') || freqLower === 's2') {
-    freq = 'evenweeks';
-  } else if (freqLower.includes('biweekly') || freqLower.includes('bi-weekly')) {
+  if (frequency.toLowerCase().includes('biweekly') || frequency.toLowerCase().includes('bi-weekly')) {
     freq = 'biweekly';
+  } else {
+    freq = normalizeTimetableFrequency(frequency);
   }
 
   return {
@@ -214,61 +211,4 @@ function getNextDayOfWeek(fromDate: Date, dayOfWeek: number): Date {
 
   result.setDate(result.getDate() + daysToAdd);
   return result;
-}
-
-/**
- * Get the Monday of the week containing a given date
- * This is important because UBB semesters start on the Monday of the week
- * containing October 1st (fall) or February 1st (spring)
- */
-function getMondayOfWeek(date: Date): Date {
-  const result = new Date(date);
-  const dayOfWeek = result.getDay();
-  // getDay() returns 0 for Sunday, 1 for Monday, etc.
-  // We need to go back to Monday (if Sunday, go back 6 days; if Monday, stay; if Tuesday, go back 1 day, etc.)
-  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  result.setDate(result.getDate() - daysToSubtract);
-  return result;
-}
-
-/**
- * Get default semester dates based on current date
- * UBB semesters start on the Monday of the week containing:
- * - October 1st for fall semester
- * - February 1st for spring semester
- * 
- * Note: The end date is set to a conservative estimate (mid-January / end of May)
- * to avoid generating events during exam periods. For accurate dates,
- * the academic calendar structure should be consulted.
- */
-export function getDefaultSemesterDates(): { start: Date; end: Date } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  let start: Date;
-  let end: Date;
-
-  // Fall semester (October - January)
-  if (month >= 9 || month <= 0) {
-    // Get October 1st of the appropriate year
-    const oct1 = new Date(month >= 9 ? year : year - 1, 9, 1);
-    // Get the Monday of the week containing October 1st
-    start = getMondayOfWeek(oct1);
-    // End date: January 18 (typical last day of teaching before exams)
-    // The exact date should come from academic calendar structure
-    end = new Date(month >= 9 ? year + 1 : year, 0, 18);
-  }
-  // Spring semester (February - June)
-  else {
-    // Get February 1st
-    const feb1 = new Date(year, 1, 1);
-    // Get the Monday of the week containing February 1st
-    start = getMondayOfWeek(feb1);
-    // End date: May 31 (typical last day of teaching before June exams)
-    // The exact date should come from academic calendar structure
-    end = new Date(year, 4, 31);
-  }
-
-  return { start, end };
 }

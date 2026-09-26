@@ -70,10 +70,12 @@ function determinePeriodType(description: string): AcademicPeriod['type'] {
       lowerDesc.includes('free day') ||
       lowerDesc.includes('holiday')) {
     return 'free-day';
+  } else if (lowerDesc.includes('pregătirea anului') ||
+             lowerDesc.includes('pregatirea anului') ||
+             lowerDesc.includes('pregătirea examenului')) {
+    return 'preparation';
   } else if (lowerDesc.includes('activitate didactică') ||
-             lowerDesc.includes('activitate didactica') ||
-             lowerDesc.includes('pregătirea anului') ||
-             lowerDesc.includes('pregatirea anului')) {
+             lowerDesc.includes('activitate didactica')) {
     return 'teaching';
   } else if (lowerDesc.includes('vacanț') ||
              lowerDesc.includes('vacant') ||
@@ -86,8 +88,6 @@ function determinePeriodType(description: string): AcademicPeriod['type'] {
     return 'retakes';
   } else if (lowerDesc.includes('practică')) {
     return 'practice';
-  } else if (lowerDesc.includes('pregătirea examenului')) {
-    return 'preparation';
   } else if (lowerDesc.includes('examen de licență') || lowerDesc.includes('disertație')) {
     return 'graduation';
   }
@@ -120,47 +120,31 @@ function extractFreeDaysFromDescription(
   // Combinăm description și notes pentru a căuta zile libere
   const fullText = `${description} ${notes || ''}`;
 
-  // Verificăm dacă textul conține "zi liberă" sau "zile libere"
-  if (!/[–\-]\s*zil?e?\s+liber[ăe]/i.test(fullText)) {
+  // The faculty's notes list dates without weekday names, sometimes joined by "și".
+  if (!/[-–]\s*zil?e?\s+liber[ăe]/i.test(fullText)) {
     return freeDays;
   }
 
-  // Găsim partea cu zilele libere (după paranteza deschisă, până la paranteza închisă sau end)
-  const freeDaysMatch = fullText.match(/\(([^)]+[–\-]\s*zil?e?\s+liber[ăe])/i);
-  if (!freeDaysMatch) {
-    return freeDays;
-  }
+  const dates = [...fullText.matchAll(/\b(\d{2})\.(\d{2})\.(\d{4})\b/g)];
+  for (let i = 0; i < dates.length; i++) {
+    const match = dates[i];
+    const nextDate = dates[i + 1];
+    const segment = fullText.slice(match.index! + match[0].length, nextDate?.index);
+    const freeDayDescription = segment
+      .replace(/[-–]\s*zil?e?\s+liber[ăe].*$/i, '')
+      .replace(/^[,\s]+|[,\s)]+$/g, '')
+      .replace(/,?\s*și$/i, '')
+      .trim();
+    const freeDayDate = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
 
-  const freeDaysText = freeDaysMatch[1];
-
-  // Pattern pentru a găsi fiecare zi liberă: dată + descriere
-  // Ex: "luni, 01.12.2025, Ziua Marii Uniri"
-  const dayPattern = /(luni|marți|miercuri|joi|vineri|sâmbătă|duminică),?\s+(\d{2}\.\d{2}\.\d{4}),\s+([^,]+?)(?=\s+(?:și|–|\-|$))/gi;
-
-  let match;
-  while ((match = dayPattern.exec(freeDaysText)) !== null) {
-    const dateStr = match[2];
-    let freeDayDescription = match[3].trim();
-
-    // Parsăm data
-    const dateParts = dateStr.split('.');
-    if (dateParts.length === 3 && freeDayDescription && freeDayDescription.length > 2) {
-      const day = parseInt(dateParts[0]);
-      const month = parseInt(dateParts[1]) - 1; // lunile sunt 0-indexed
-      const year = parseInt(dateParts[2]);
-
-      const freeDayDate = new Date(year, month, day);
-
-      // Verificăm că data este în intervalul perioadei
-      if (freeDayDate >= periodStartDate && freeDayDate <= periodEndDate) {
-        freeDays.push({
-          startDate: freeDayDate,
-          endDate: freeDayDate,
-          type: 'free-day',
-          description: freeDayDescription,
-          notes: 'Zi liberă națională'
-        });
-      }
+    if (freeDayDescription && freeDayDate >= periodStartDate && freeDayDate <= periodEndDate) {
+      freeDays.push({
+        startDate: freeDayDate,
+        endDate: freeDayDate,
+        type: 'free-day',
+        description: freeDayDescription,
+        notes: 'Zi liberă națională'
+      });
     }
   }
 

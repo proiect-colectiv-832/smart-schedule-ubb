@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import { UserTimetableEntry } from '../src/database/user-timetable-db';
 import { AcademicYearStructure, scrapeAcademicCalendar } from '../src/calendar-subscription/academic-calendar-scraper';
-import { generateUserICSFile } from '../src/calendar-subscription/user-ics-generator';
+import { generateUserICSFile, invalidateUserAcademicCache } from '../src/calendar-subscription/user-ics-generator';
 
 jest.mock('fs/promises', () => ({
   ...jest.requireActual('fs/promises'),
@@ -49,6 +49,7 @@ describe('user-ics-generator recurrence parity', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    invalidateUserAcademicCache();
   });
 
   test('uses semester II terminal structure when isTerminalYear is true', async () => {
@@ -219,8 +220,8 @@ describe('user-ics-generator recurrence parity', () => {
 
     const dates = extractEventDatesBySummary(writtenContent, 'Algoritmi (lecture)');
 
-    expect(dates).toEqual(['20260420', '20260511']);
-    expect(dates).not.toContain('20260504');
+    expect(dates).toEqual(['20260504', '20260518']);
+    expect(dates).not.toContain('20260511');
   });
 
   test('keeps odd/even parity aligned after vacation for mid-week classes too', async () => {
@@ -289,8 +290,7 @@ describe('user-ics-generator recurrence parity', () => {
 
     const dates = extractEventDatesBySummary(writtenContent, 'Retele (lecture)');
 
-    expect(dates).toEqual(['20260422', '20260513']);
-    expect(dates).not.toContain('20260506');
+    expect(dates).toEqual(['20260506', '20260520']);
+    expect(dates).not.toContain('20260513');
   });
 });
-

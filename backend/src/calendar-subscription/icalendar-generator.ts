@@ -3,15 +3,15 @@
  * Generates valid iCalendar (.ics) feeds for user timetables
  */
 
-import ical, { ICalCalendar, ICalEventData } from 'ical-generator';
+import ical, { ICalAlarmType, ICalCalendar, ICalEventData } from 'ical-generator';
 import { UserTimetable, UserEvent, RecurrenceRule } from './user-timetable-manager';
 import {
   scrapeAcademicCalendar,
   getVacations,
   getFreeDays,
-  isNonTeachingDay,
   AcademicYearStructure
 } from './academic-calendar-scraper';
+import { getTeachingOccurrences, getTeachingTerm, occurrenceId } from './teaching-weeks';
 
 const TIMEZONE = 'Europe/Bucharest';
 const CALENDAR_NAME = 'UBB Smart Schedule';
@@ -46,8 +46,7 @@ function getTimezoneGenerator() {
 }
 
 // Cache pentru structura academică (să nu facem scraping la fiecare request)
-let cachedAcademicStructure: AcademicYearStructure | null = null;
-let cacheTimestamp: Date | null = null;
+const academicStructureCache = new Map<'ro-en' | 'hu-de', { structure: AcademicYearStructure; timestamp: Date }>();
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 ore
 
 /**
@@ -56,10 +55,11 @@ const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 ore
 async function getAcademicStructure(language: 'ro-en' | 'hu-de' = 'ro-en'): Promise<AcademicYearStructure | null> {
   try {
     // Verificăm cache-ul
-    if (cachedAcademicStructure && cacheTimestamp) {
+    const cached = academicStructureCache.get(language);
+    if (cached) {
       const now = new Date();
-      if (now.getTime() - cacheTimestamp.getTime() < CACHE_DURATION_MS) {
-        return cachedAcademicStructure;
+      if (now.getTime() - cached.timestamp.getTime() < CACHE_DURATION_MS) {
+        return cached.structure;
       }
     }
 
@@ -71,8 +71,7 @@ async function getAcademicStructure(language: 'ro-en' | 'hu-de' = 'ro-en'): Prom
     const structure = structures.find(s => s.language === language);
 
     if (structure) {
-      cachedAcademicStructure = structure;
-      cacheTimestamp = new Date();
+      academicStructureCache.set(language, { structure, timestamp: new Date() });
       console.log(`Academic calendar cached for ${structure.academicYear}`);
       return structure;
     }
@@ -129,10 +128,11 @@ export async function generateICalendar(
 
   // Obținem structura academică
   const academicStructure = await getAcademicStructure(opts.language);
+  if (!academicStructure) throw new Error('Academic structure is unavailable');
 
   // Add each event to the calendar (cu filtrare pentru vacanțe)
   for (const event of timetable.events) {
-    addEventToCalendar(calendar, event, timetable, academicStructure, opts.isTerminalYear);
+    addEventToCalendar(calendar, event, timetable, academicStructure, opts.isTerminalYear, userId);
   }
 
   // Adăugăm vacanțele ca evenimente all-day
@@ -261,37 +261,49 @@ function addExamPeriodEvents(
 }
 
 /**
- * Verifică dacă un eveniment cade în vacanță sau zi liberă și ar trebui exclus
- */
-function shouldExcludeEvent(
-  event: UserEvent,
-  structure: AcademicYearStructure | null
-): boolean {
-  if (!structure) return false;
-
-  // Nu excludem evenimente one-time sau evenimente speciale (custom)
-  if (!event.isRecurring) return false;
-  if (event.type === 'custom') return false;
-
-  // Verificăm dacă evenimentul începe într-o vacanță sau zi liberă
-  const eventDate = new Date(event.startTime);
-  return isNonTeachingDay(eventDate, structure);
-}
-
-/**
  * Add a single event to the iCalendar
  */
 function addEventToCalendar(
   calendar: ICalCalendar,
   event: UserEvent,
   timetable: UserTimetable,
-  academicStructure: AcademicYearStructure | null,
-  isTerminalYear: boolean
+  academicStructure: AcademicYearStructure,
+  isTerminalYear: boolean,
+  userId: string,
+  dateRange?: { start: Date; end: Date }
 ): void {
-  // Verificăm dacă evenimentul ar trebui exclus (e în vacanță)
-  if (shouldExcludeEvent(event, academicStructure)) {
-    return; // Nu adăugăm cursuri care cad în vacanță
+  if (event.isRecurring && event.recurrenceRule && event.type !== 'custom') {
+    const term = getTeachingTerm(academicStructure, event.startTime, isTerminalYear);
+    if (!term) return; // A timetable from a different academic year has no current teaching dates.
+
+    for (const occurrence of getTeachingOccurrences(event, academicStructure, term)) {
+      if (dateRange && (occurrence.start < dateRange.start || occurrence.start > dateRange.end)) continue;
+      const occurrenceData: ICalEventData = {
+        id: occurrenceId(userId, event.id, occurrence.start),
+        summary: event.title,
+        start: occurrence.start,
+        end: occurrence.end,
+        location: event.location || '',
+        description: event.description || '',
+        timezone: TIMEZONE,
+        categories: [{ name: event.type.toUpperCase() }],
+      };
+      if (event.color) {
+        (occurrenceData as ICalEventData & { color?: string }).color = event.color;
+      }
+      if (event.type === 'lecture' || event.type === 'lab') {
+        occurrenceData.alarms = [{
+          type: ICalAlarmType.display,
+          trigger: 900,
+          description: `${event.title} starts in 15 minutes`
+        }];
+      }
+      calendar.createEvent(occurrenceData);
+    }
+    return;
   }
+
+  if (dateRange && (event.startTime < dateRange.start || event.startTime > dateRange.end)) return;
 
   const eventData: ICalEventData = {
     id: event.id,
@@ -320,15 +332,6 @@ function addEventToCalendar(
       isTerminalYear
     );
     if (rrule) {
-      // Adăugăm EXDATE pentru vacanțe (exclude specific dates)
-      if (academicStructure) {
-        const excludeDates = getVacationExcludeDates(event, academicStructure);
-        if (excludeDates.length > 0) {
-          // Adăugăm exclude direct în rrule (conform ical-generator API)
-          rrule.exclude = excludeDates;
-          rrule.excludeTimezone = TIMEZONE;
-        }
-      }
       eventData.repeating = rrule;
     }
   }
@@ -343,7 +346,7 @@ function addEventToCalendar(
   if (event.type === 'lecture' || event.type === 'lab') {
     eventData.alarms = [
       {
-        type: 'display' as any,
+        type: ICalAlarmType.display,
         trigger: 900, // 15 minutes before (in seconds)
         description: `${event.title} starts in 15 minutes`
       }
@@ -352,42 +355,6 @@ function addEventToCalendar(
 
 
   calendar.createEvent(eventData);
-}
-
-/**
- * Obține datele care trebuie excluse din recurring events (vacanțe)
- */
-function getVacationExcludeDates(
-  event: UserEvent,
-  structure: AcademicYearStructure
-): Date[] {
-  const excludeDates: Date[] = [];
-  const vacations = getVacations(structure);
-
-  // Pentru fiecare vacanță, găsim toate datele când ar cădea acest curs
-  for (const vacation of vacations) {
-    let currentDate = new Date(vacation.startDate);
-    const endDate = vacation.endDate;
-
-    while (currentDate <= endDate) {
-      // Verificăm dacă ziua din săptămână se potrivește cu cursul
-      const eventDate = new Date(event.startTime);
-      if (currentDate.getDay() === eventDate.getDay()) {
-        // Creăm o dată exactă cu ora cursului
-        const excludeDate = new Date(currentDate);
-        excludeDate.setHours(eventDate.getHours());
-        excludeDate.setMinutes(eventDate.getMinutes());
-        excludeDate.setSeconds(0);
-        excludeDate.setMilliseconds(0);
-        excludeDates.push(excludeDate);
-      }
-
-      // Trecem la următoarea zi
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-  }
-
-  return excludeDates;
 }
 
 /**
@@ -560,15 +527,11 @@ export async function generateICalendarForDateRange(
 
   // Obținem structura academică
   const academicStructure = await getAcademicStructure(opts.language);
+  if (!academicStructure) throw new Error('Academic structure is unavailable');
 
-  // Filter events within the date range
-  const filteredEvents = timetable.events.filter(event => {
-    const eventStart = new Date(event.startTime);
-    return eventStart >= startDate && eventStart <= endDate;
-  });
-
-  for (const event of filteredEvents) {
-    addEventToCalendar(calendar, event, timetable, academicStructure, opts.isTerminalYear);
+  for (const event of timetable.events) {
+    addEventToCalendar(calendar, event, timetable, academicStructure, opts.isTerminalYear, userId,
+      { start: startDate, end: endDate });
   }
 
   // Adăugăm vacanțele în range-ul specificat
@@ -594,8 +557,7 @@ export async function generateICalendarForDateRange(
  * Invalidate the academic structure cache (useful for testing or manual refresh)
  */
 export function invalidateAcademicCache(): void {
-  cachedAcademicStructure = null;
-  cacheTimestamp = null;
+  academicStructureCache.clear();
   console.log('Academic calendar cache invalidated');
 }
 
@@ -695,4 +657,3 @@ export function getCalendarMetadata(timetable: UserTimetable): {
 
   return metadata;
 }
-
