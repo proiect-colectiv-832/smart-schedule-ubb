@@ -8,9 +8,10 @@ import { parseCourseList } from '../parsers/subject-list-parser';
 import { parseSubjectTimetable } from '../parsers/subject-timetable-parser';
 import { TimetableEntry } from '../types';
 
-const UBB_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar';
+const UBB_SEMESTER_URL = 'https://www.cs.ubbcluj.ro/files/orar/2026-1';
+const UBB_BASE_URL = `${UBB_SEMESTER_URL}/tabelar`;
 const UBB_INDEX_URL = `${UBB_BASE_URL}/index.html`;
-const UBB_SUBJECTS_LIST_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-2/disc/index.html';
+const UBB_SUBJECTS_LIST_URL = `${UBB_SEMESTER_URL}/disc/index.html`;
 const CACHE_DIR = path.join(__dirname, '..', 'cache');
 const FIELDS_CACHE_FILE = path.join(CACHE_DIR, 'fields.json');
 const SUBJECTS_CACHE_FILE = path.join(CACHE_DIR, 'subjects.json');
@@ -149,7 +150,7 @@ async function cacheSubjects(fields: Field[]): Promise<Optional_subject[]> {
   // Fetch the course list with codes
   console.log('   Fetching subject codes from course list...');
   const subjects: Optional_subject[] = [];
-  const UBB_DISC_BASE_URL = 'https://www.cs.ubbcluj.ro/files/orar/2025-2/disc';
+  const UBB_DISC_BASE_URL = `${UBB_SEMESTER_URL}/disc`;
 
   try {
     const courseList = await parseCourseList(UBB_SUBJECTS_LIST_URL);

@@ -666,7 +666,7 @@ app.get('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({
         error: 'Missing or invalid URL parameter',
         message: 'Please provide a valid URL as a query parameter: ?url=<timetable_url>',
-        example: '/parse?url=https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar/MIE3.html',
+        example: '/parse?url=https://www.cs.ubbcluj.ro/files/orar/2026-1/tabelar/MIE3.html',
       });
     }
 
@@ -780,8 +780,8 @@ app.get('/example-urls', (req: Request, res: Response) => {
     baseUrl: 'https://www.cs.ubbcluj.ro/files/orar/',
     urlPattern: '{baseUrl}{YEAR}-{SEMESTER}/tabelar/{SPECIALIZATION}{YEAR_OF_STUDY}.html',
     examples: {
-      'MIE Year 3, Semester 2, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar/MIE3.html',
-      'CTI Year 1, Semester 2, 2025': 'https://www.cs.ubbcluj.ro/files/orar/2025-2/tabelar/CTI1.html',
+      'MIE Year 3, Semester 1, 2026': 'https://www.cs.ubbcluj.ro/files/orar/2026-1/tabelar/MIE3.html',
+      'CTI Year 1, Semester 1, 2026': 'https://www.cs.ubbcluj.ro/files/orar/2026-1/tabelar/CTI1.html',
       'INFO Year 4, Semester 2, 2024': 'https://www.cs.ubbcluj.ro/files/orar/2024-2/tabelar/INFO4.html',
     },
     specializations: ['MIE', 'CTI', 'INFO', 'MI'],
